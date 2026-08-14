@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — Padel Platform
+ *
+ * Direction: warm near-black/near-white neutrals (never pure #000/#fff, per
+ * craft-floor) with a single saturated accent, "court blue" — evoking the
+ * blue synthetic-turf courts used on the professional tour, deliberately not
+ * the generic AI-purple/gold SaaS default. Restrained color strategy
+ * (Operate mode default): the accent is reserved for primary actions,
+ * current-state indicators, and links — never decoration.
+ *
+ * Club branding (docs/07_UX_UI_ARCHITECTURE.md §4) overrides --color-accent
+ * and --color-club-* at the surface root via inline style once a club's
+ * palette passes WCAG AA validation (see lib/color/contrast.ts) — the base
+ * tokens below are the platform default, not a hardcoded final look.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #fafaf9;
+  --surface: #ffffff;
+  --surface-secondary: #f4f3f1;
+  --foreground: #1c1917;
+  --muted-foreground: #57534e;
+  --border: #e7e5e4;
+  --border-strong: #d6d3d1;
+
+  --accent: #2454e0;
+  --accent-foreground: #ffffff;
+  --accent-muted: #e8edfc;
+
+  --success: #15803d;
+  --success-foreground: #ffffff;
+  --success-muted: #e7f5ec;
+  --warning: #b45309;
+  --warning-foreground: #ffffff;
+  --warning-muted: #fbf1e2;
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+  --destructive-muted: #fbeaea;
+
+  --ring: var(--accent);
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+}
+
+:root.dark {
+  --background: #121110;
+  --surface: #1a1817;
+  --surface-secondary: #211e1c;
+  --foreground: #f5f4f2;
+  --muted-foreground: #a8a29e;
+  --border: #2e2b28;
+  --border-strong: #3a3532;
+
+  --accent: #5b83ec;
+  --accent-foreground: #0c0b0a;
+  --accent-muted: #1c2540;
+
+  --success: #4ade80;
+  --success-foreground: #0c0b0a;
+  --success-muted: #16281d;
+  --warning: #f0a94e;
+  --warning-foreground: #0c0b0a;
+  --warning-muted: #2c2114;
+  --destructive: #f27272;
+  --destructive-foreground: #0c0b0a;
+  --destructive-muted: #2c1717;
+}
+
+@theme inline {
+  --font-sans: var(--font-barlow);
+  --font-display: var(--font-barlow-condensed);
+
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-muted: var(--accent-muted);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-muted: var(--success-muted);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-muted: var(--warning-muted);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-muted: var(--destructive-muted);
+
+  --color-ring: var(--ring);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-accent-foreground);
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
