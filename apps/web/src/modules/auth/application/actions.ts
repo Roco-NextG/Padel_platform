@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { isAuthApiError } from "@supabase/supabase-js";
 import { signInSchema, signUpSchema } from "../domain/schemas";
 import { signInWithPassword, signOutUser, signUpWithPassword } from "../infrastructure/authRepository";
 import { belongsOnClubSurface } from "../domain/roles";
@@ -32,7 +33,7 @@ export async function signUpAction(
 
   const { data, error } = await signUpWithPassword(parsed.data);
   if (error) {
-    return { error: translateAuthError(error.message), values: raw };
+    return { error: translateAuthError(error), values: raw };
   }
   if (!data.user) {
     return { error: "No se pudo crear la cuenta. Intenta de nuevo.", values: raw };
@@ -63,7 +64,7 @@ export async function signInAction(
 
   const { data, error } = await signInWithPassword(parsed.data);
   if (error) {
-    return { error: translateAuthError(error.message), values: { email } };
+    return { error: translateAuthError(error), values: { email } };
   }
   if (!data.user) {
     return { error: "No se pudo iniciar sesión. Intenta de nuevo.", values: { email } };
@@ -84,11 +85,37 @@ export async function signOutAction() {
   redirect("/login");
 }
 
-function translateAuthError(message: string): string {
-  if (message.includes("Invalid login credentials")) return "Email o contraseña incorrectos.";
-  if (message.includes("User already registered")) return "Ya existe una cuenta con este email.";
-  if (message.includes("Password should be at least")) {
-    return "La contraseña debe tener al menos 8 caracteres.";
+/**
+ * Supabase's auth-js attaches a stable `code` (e.g. "email_address_invalid",
+ * "over_email_send_rate_limit") to every AuthApiError — matching on that is
+ * reliable across SDK/locale versions, unlike substring-matching `.message`.
+ * Full list: node_modules/@supabase/auth-js/src/lib/error-codes.ts.
+ */
+function translateAuthError(error: unknown): string {
+  const code = isAuthApiError(error) ? error.code : undefined;
+
+  switch (code) {
+    case "invalid_credentials":
+      return "Email o contraseña incorrectos.";
+    case "user_already_exists":
+    case "email_exists":
+      return "Ya existe una cuenta con este email.";
+    case "weak_password":
+      return "La contraseña debe tener al menos 8 caracteres.";
+    case "email_address_invalid":
+      return "Ese email no es válido. Revisa que esté bien escrito.";
+    case "email_address_not_authorized":
+      return "Este email no está autorizado para registrarse todavía.";
+    case "over_email_send_rate_limit":
+      return "Se enviaron demasiados emails en poco tiempo. Espera unos minutos e intenta de nuevo.";
+    case "over_request_rate_limit":
+      return "Demasiados intentos. Espera un momento e intenta de nuevo.";
+    case "signup_disabled":
+    case "email_provider_disabled":
+      return "El registro no está habilitado todavía. Contacta al administrador.";
+    case "user_banned":
+      return "Esta cuenta fue suspendida.";
+    default:
+      return "Ocurrió un error. Intenta de nuevo.";
   }
-  return "Ocurrió un error. Intenta de nuevo.";
 }
