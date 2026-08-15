@@ -3,7 +3,8 @@ import { phaseTypeLabel } from "../domain/bracket";
 import type { BracketDisplayMatch, BracketDisplayRound } from "../infrastructure/tournamentRepository";
 import { MatchStatusBadge } from "@/modules/matches/ui/match-status-badge";
 
-const CARD_HEIGHT = 88;
+/** 99px de contenido real (2 filas de equipo + divisor + fila de estado, con el padding del card) — 108 deja margen sin desperdiciar espacio. */
+const CARD_HEIGHT = 108;
 const CARD_WIDTH = 208;
 const CONNECTOR_WIDTH = 40;
 const BASE_GAP = 20;
@@ -62,7 +63,7 @@ function BracketMatchCard({ match }: { match: BracketDisplayMatch }) {
   return (
     <div
       className={cn(
-        "flex h-full w-full flex-col justify-center gap-1.5 rounded-lg border px-3 py-2",
+        "flex h-full w-full flex-col justify-center gap-1.5 overflow-hidden rounded-lg border px-3 py-2",
         isPending ? "border-dashed border-border bg-surface-secondary/40" : "border-border-strong bg-surface"
       )}
     >
