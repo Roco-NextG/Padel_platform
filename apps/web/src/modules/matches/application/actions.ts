@@ -12,7 +12,29 @@ import {
 } from "../infrastructure/matchRepository";
 import { fetchAuthenticatedUser } from "@/modules/auth/infrastructure/authRepository";
 import { fetchPlayerByUserId } from "@/modules/players/infrastructure/playerRepository";
-import { recordRatingEventsForMatch } from "@/modules/rating/application/recordRatingEventsForMatch";
+import {
+  isDuplicateRatingEventsError,
+  recordRatingEventsForMatch,
+} from "@/modules/rating/application/recordRatingEventsForMatch";
+
+/**
+ * The rating side-effect never gets to fail the primary action: the match
+ * confirmation itself already succeeded by the time this runs. A duplicate
+ * rejection (double-click, retry, two near-simultaneous confirmations — see
+ * isDuplicateRatingEventsError) means the rating was already applied by the
+ * first call, so it's silently ignored. Anything else is unexpected and
+ * worth knowing about, but still shouldn't turn a successful confirmation
+ * into an error response — it's logged server-side instead.
+ */
+async function recordRatingEventsIgnoringDuplicates(matchId: string): Promise<void> {
+  try {
+    await recordRatingEventsForMatch(matchId);
+  } catch (e) {
+    if (!isDuplicateRatingEventsError(e)) {
+      console.error(`recordRatingEventsForMatch falló para el partido ${matchId}:`, e);
+    }
+  }
+}
 
 export interface MatchActionState {
   error: string | null;
@@ -88,7 +110,7 @@ export async function submitMatchResultAction(
   }
 
   if (updated.status === "CONFIRMED") {
-    await recordRatingEventsForMatch(matchId);
+    await recordRatingEventsIgnoringDuplicates(matchId);
   }
 
   revalidatePath(`/dashboard/partidos/${matchId}`);
@@ -115,7 +137,7 @@ async function respondToMatch(matchId: string, confirmed: boolean): Promise<Matc
 
   const status = await fetchMatchStatus(matchId);
   if (status === "CONFIRMED") {
-    await recordRatingEventsForMatch(matchId);
+    await recordRatingEventsIgnoringDuplicates(matchId);
   }
 
   revalidatePath("/");

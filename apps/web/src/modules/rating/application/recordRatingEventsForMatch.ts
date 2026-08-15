@@ -78,3 +78,26 @@ export async function recordRatingEventsForMatch(matchId: string) {
   const events = applyMatchResult(input);
   return insertRatingEvents(events);
 }
+
+/**
+ * True when `error` is `record_rating_events` rejecting a match that
+ * already has active rating events (0008_rating_rpc_player_validation.sql)
+ * — the expected outcome of a double-click, a network retry, or two
+ * near-simultaneous confirmations that both see the match as CONFIRMED.
+ * The rating was already applied by whichever call landed first; this is
+ * not a failure the caller needs to surface.
+ *
+ * Matches two forms: the function's own readable message (the common,
+ * sequential case) and the raw unique_violation Postgres raises when two
+ * calls are genuinely concurrent and both pass the function's own check
+ * before either commits — the partial unique index on
+ * `rating_events(player_id, match_id) where not superseded` is what
+ * actually guarantees this under real concurrency, not the check itself.
+ */
+export function isDuplicateRatingEventsError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.message.includes("ya tiene eventos de rating registrados") ||
+    error.message.includes("rating_events_player_match_active_unique")
+  );
+}
