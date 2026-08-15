@@ -1,0 +1,16 @@
+{
+  "name": "@padel-platform/rating-engine",
+  "version": "0.1.0",
+  "description": "Rating Engine: Glicko-2 adaptado con efecto compañero desde el día 1. Logica pura, sin dependencias de framework (ver 09_TECHNICAL_ARCHITECTURE.md).",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

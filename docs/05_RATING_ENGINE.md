@@ -31,8 +31,10 @@ Para el partido `Team A (jugador A1, A2)` vs `Team B (jugador B1, B2)`:
 team_rating(A) = promedio_ponderado(r_A1, r_A2)   -- ponderado por RD: jugador con más confianza pesa más
 team_rating(B) = promedio_ponderado(r_B1, r_B2)
 
-expected_score(A) = 1 / (1 + 10^((team_rating(B) - team_rating(A)) / 400))
+expected_score(A) = 1 / (1 + 10^((team_rating(B) - team_rating(A)) / D))
 ```
+
+> **Corrección hecha durante la implementación:** el divisor original (400) está calibrado para escalas tipo Elo (cientos de puntos). En la escala 1-7 de este producto, un divisor de 400 deja `expected_score` pegado a ~0.5 casi sin importar la diferencia real de nivel entre equipos. Se usa `D = 2.0` (configurable en `packages/rating-engine/src/config.ts`), calibrado para que una diferencia de ~2 puntos de rating ya implique ~90% de probabilidad esperada. Mismo criterio que el resto del documento: coeficiente ajustable, no congelado.
 
 ---
 

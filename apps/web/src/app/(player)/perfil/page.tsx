@@ -5,6 +5,7 @@ import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUser
 import { getPlayerProfileForUser } from "@/modules/players/application/getPlayerProfile";
 import { signOutAction } from "@/modules/auth/application/actions";
 import { PlayerProfileForm } from "@/modules/players/ui/player-profile-form";
+import { RatingBadge } from "@/modules/players/ui/rating-badge";
 
 export const metadata: Metadata = { title: "Tu perfil — Padel Platform" };
 
@@ -21,6 +22,8 @@ export default async function ProfilePage() {
         <h1 className="text-2xl font-semibold tracking-tight">Tu perfil</h1>
         <p className="text-sm text-muted-foreground">{context.email}</p>
       </div>
+
+      <RatingBadge rating={player.currentRating} rd={player.currentRatingDeviation} />
 
       <PlayerProfileForm player={player} />
 

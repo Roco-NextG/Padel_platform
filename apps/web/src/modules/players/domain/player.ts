@@ -29,11 +29,3 @@ export const playerProfileSchema = z.object({
 });
 
 export type PlayerProfileInput = z.infer<typeof playerProfileSchema>;
-
-/** Rating confidence label — docs/05_RATING_ENGINE.md §6: shown explicitly, never a bare number. */
-export function ratingConfidence(rd: number | null): "Baja" | "Media" | "Alta" | null {
-  if (rd == null) return null;
-  if (rd >= 200) return "Baja";
-  if (rd >= 80) return "Media";
-  return "Alta";
-}

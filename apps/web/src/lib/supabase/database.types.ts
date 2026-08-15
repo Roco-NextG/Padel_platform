@@ -1,13 +1,14 @@
 /**
- * Hand-written subset of the generated Supabase types, covering only the
- * tables/enums touched by this phase (Auth, Players, Clubs, Organizers —
- * see supabase/migrations/0001_schema.sql). Once the project is linked to a
- * live Supabase instance, replace this file with the real output of:
+ * Hand-written subset of the generated Supabase types, covering the tables
+ * touched so far (Auth, Players, Clubs, Organizers, plus the Teams/Matches/
+ * SetScores/RatingEvents slice needed to wire the Rating Engine — see
+ * supabase/migrations/0001_schema.sql). Tournament lifecycle tables
+ * (tournaments, tournament_categories/groups/phases) and the Match Engine's
+ * own flow (match_confirmations) still aren't typed here — add them when
+ * those modules get built. Once the project is linked to a live Supabase
+ * instance, consider replacing this file with the real output of:
  *
  *   supabase gen types typescript --project-id <id> > src/lib/supabase/database.types.ts
- *
- * which will cover the full schema (tournaments, matches, rating_events...)
- * as those modules get built.
  */
 
 export type GenderType = "MALE" | "FEMALE" | "OTHER";
@@ -23,6 +24,15 @@ export type AppRole =
   | "ORGANIZER"
   | "TOURNAMENT_STAFF"
   | "PLAYER";
+export type MatchStatus =
+  | "SCHEDULED"
+  | "IN_PROGRESS"
+  | "PENDING_CONFIRMATION"
+  | "CONFIRMED"
+  | "DISPUTED"
+  | "CANCELLED";
+export type DbMatchType = "TOURNAMENT" | "COMPETITIVE" | "CASUAL";
+export type RatingReason = "TOURNAMENT_MATCH" | "COMPETITIVE_MATCH";
 
 export interface ClubBranding {
   logo_url?: string | null;
@@ -151,6 +161,132 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["user_roles"]["Insert"]>;
       };
+      teams: {
+        Relationships: [];
+        Row: {
+          id: string;
+          tournament_category_id: string | null;
+          group_id: string | null;
+          seed: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tournament_category_id?: string | null;
+          group_id?: string | null;
+          seed?: number | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["teams"]["Insert"]>;
+      };
+      team_members: {
+        Relationships: [];
+        Row: {
+          id: string;
+          team_id: string;
+          player_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          team_id: string;
+          player_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["team_members"]["Insert"]>;
+      };
+      matches: {
+        Relationships: [];
+        Row: {
+          id: string;
+          tournament_id: string | null;
+          phase_id: string | null;
+          group_id: string | null;
+          round_index: number | null;
+          court_id: string | null;
+          team_a_id: string | null;
+          team_b_id: string | null;
+          scheduled_start: string | null;
+          scheduled_end: string | null;
+          actual_start: string | null;
+          actual_end: string | null;
+          status: MatchStatus;
+          winner_team_id: string | null;
+          match_type: DbMatchType;
+          created_at: string;
+          updated_at: string;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          tournament_id?: string | null;
+          phase_id?: string | null;
+          group_id?: string | null;
+          round_index?: number | null;
+          court_id?: string | null;
+          team_a_id?: string | null;
+          team_b_id?: string | null;
+          scheduled_start?: string | null;
+          scheduled_end?: string | null;
+          status?: MatchStatus;
+          winner_team_id?: string | null;
+          match_type?: DbMatchType;
+        };
+        Update: Partial<Database["public"]["Tables"]["matches"]["Insert"]>;
+      };
+      set_scores: {
+        Relationships: [];
+        Row: {
+          id: string;
+          match_id: string;
+          set_number: number;
+          team_a_games: number;
+          team_b_games: number;
+          tiebreak_a: number | null;
+          tiebreak_b: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          match_id: string;
+          set_number: number;
+          team_a_games: number;
+          team_b_games: number;
+          tiebreak_a?: number | null;
+          tiebreak_b?: number | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["set_scores"]["Insert"]>;
+      };
+      rating_events: {
+        Relationships: [];
+        Row: {
+          id: string;
+          player_id: string;
+          match_id: string;
+          partner_id: string | null;
+          old_rating: number;
+          new_rating: number;
+          old_rd: number;
+          new_rd: number;
+          reason: RatingReason;
+          algorithm_version: string;
+          superseded: boolean;
+          created_at: string;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          player_id: string;
+          match_id: string;
+          partner_id?: string | null;
+          old_rating: number;
+          new_rating: number;
+          old_rd: number;
+          new_rd: number;
+          reason: RatingReason;
+          algorithm_version: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["rating_events"]["Insert"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -167,6 +303,23 @@ export interface Database {
         Args: { p_club_id: string; p_branding: ClubBranding };
         Returns: Database["public"]["Tables"]["clubs"]["Row"];
       };
+      record_rating_events: {
+        Args: { p_events: RatingEventRpcInput[] };
+        Returns: Database["public"]["Tables"]["rating_events"]["Row"][];
+      };
     };
   };
+}
+
+/** Shape sent to the record_rating_events RPC — mirrors RatingEventOutput from @padel-platform/rating-engine. */
+export interface RatingEventRpcInput {
+  playerId: string;
+  matchId: string;
+  partnerId: string;
+  oldRating: number;
+  newRating: number;
+  oldRD: number;
+  newRD: number;
+  reason: RatingReason;
+  algorithmVersion: string;
 }

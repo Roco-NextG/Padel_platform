@@ -21,6 +21,7 @@ apps/
         players/    idem — CRUD de perfil de jugador
         clubs/      idem — CRUD de club + branding (con validación de contraste WCAG AA)
         organizers/ idem — CRUD de organizador
+        rating/     application (recordRatingEventsForMatch) · infrastructure (Supabase) — ver nota abajo
       lib/
         supabase/    client.ts (browser) · server.ts (RSC/actions) · session.ts (proxy helper) · database.types.ts
         color/       contrast.ts — validador WCAG AA para branding de club
@@ -29,16 +30,23 @@ apps/
 packages/
   tournament-engine/            Lógica pura: grupos, standings, seeding, bracket con byes.
                                  27 tests, ver packages/tournament-engine/README.md
+  rating-engine/                Lógica pura: Glicko-2 adaptado + efecto compañero desde el día 1.
+                                 22 tests, ver packages/rating-engine/README.md
 
 supabase/
   migrations/
     0001_schema.sql             Schema completo (identidad, clubes, torneos, partidos, rating, auditoría)
     0002_rls.sql                RLS + helpers de RBAC + patrón RPC security definer
     0003_club_organizer_rpc.sql create_club / update_club_branding — ver nota abajo
+    0004_rating_rpc.sql         record_rating_events — único punto de escritura de rating_events
 
 PRODUCT.md                      Contexto de producto (usuarios, alcance, principios)
 DESIGN.md                       Sistema de diseño construido (tokens, tipografía, componentes)
 ```
+
+`packages/*` compilan a `dist/` (no está en git). `npm run dev` y `npm run build` en la raíz
+ya lo hacen por ti; si corres algo dentro de `apps/web` directamente, compila los packages
+primero (`npm run build -w packages/tournament-engine -w packages/rating-engine`).
 
 ## Stack
 
@@ -55,8 +63,9 @@ npm install
 ```
 
 1. Crea un proyecto en [supabase.com](https://supabase.com) (o usa Supabase CLI local).
-2. Corre las migraciones en orden: `supabase/migrations/0001_schema.sql`, `0002_rls.sql`,
-   `0003_club_organizer_rpc.sql` (SQL Editor del dashboard, o `supabase db push` con el CLI).
+2. Corre las migraciones en orden: `0001_schema.sql`, `0002_rls.sql`,
+   `0003_club_organizer_rpc.sql`, `0004_rating_rpc.sql` (SQL Editor del dashboard, o
+   `supabase db push` con el CLI) — el orden importa, cada una depende de la anterior.
 3. Copia `apps/web/.env.local.example` a `apps/web/.env.local` y completa con la URL y
    anon key de tu proyecto (Project Settings → API).
 4. `npm run dev` (levanta `apps/web` en `http://localhost:3000`).
@@ -89,21 +98,37 @@ propio `0002_rls.sql` ya dejaba documentado ahí para `submit_match_result`. No 
 policy nueva de escritura directa — vale la pena que lo revises antes de aplicarlo en
 producción.
 
+## Nota sobre `0004_rating_rpc.sql`
+
+`packages/rating-engine` es lógica pura (Glicko-2 adaptado + efecto compañero, cold start,
+recalculo histórico — ver su README) y no la reimplementamos ni recalibramos: solo se integró.
+`rating_events` no tiene policy de insert para `authenticated` (0002_rls.sql) — el rating nunca
+se escribe directo desde el cliente, ni desde esta capa de aplicación. `record_rating_events`
+es el único punto de entrada: recibe los `RatingEventOutput` ya calculados, valida que el
+partido esté `CONFIRMED` y que el caller lo administre, inserta las filas y proyecta
+`players.current_rating`/`current_rating_deviation`.
+
+El punto de integración con el resto del sistema es
+`modules/rating/application/recordRatingEventsForMatch.ts` — no está conectado a ningún flujo
+todavía porque el Match Engine (confirmación de resultado, Fase 6) no existe aún. Cuando se
+construya, debe invocar esta función en el momento exacto en que `Match.status` pasa a
+`CONFIRMED`, y en ningún otro momento.
+
 ## Qué está construido vs. qué falta
 
 **Construido en esta fase:** Auth (registro, login, roles, RBAC vía RLS), CRUD de
-Player/Club/Organizer, shells de Player (mobile) y Club/Organizer (desktop) con estados
-vacíos honestos donde el resto del producto todavía no existe.
+Player/Club/Organizer, shells de Player (mobile) y Club/Organizer (desktop), y la integración
+del Rating Engine (lectura de equipos/jugadores, cómputo puro, persistencia vía RPC, rating +
+confianza visibles en perfil y home) — lista para que el Match Engine la dispare.
 
 **No construido todavía** (ver `docs/10_ROADMAP.md` — son las próximas fases): Tournament
-Engine conectado a UI/DB, Match Engine, Rating Engine conectado, Discovery, Content Composer,
-Admin panel. `packages/tournament-engine` ya tiene la lógica pura lista (27 tests) pero sin
-wiring a base de datos ni pantallas.
+Engine conectado a UI/DB, Match Engine (validación de scoring, confirmación de 4 jugadores),
+Discovery, Content Composer, Admin panel.
 
 ## Tests
 
 ```bash
-npm run test          # tournament-engine (27 tests, vitest)
-npm run build          # build de producción de apps/web (incluye typecheck)
+npm run test          # tournament-engine (27 tests) + rating-engine (22 tests), vitest
+npm run build          # compila los packages + build de producción de apps/web (incluye typecheck)
 npm run lint            # eslint de apps/web
 ```
