@@ -39,6 +39,8 @@ supabase/
     0002_rls.sql                RLS + helpers de RBAC + patrón RPC security definer
     0003_club_organizer_rpc.sql create_club / update_club_branding — ver nota abajo
     0004_rating_rpc.sql         record_rating_events — único punto de escritura de rating_events
+    0005_club_audit_and_contrast.sql  triggers: auditoría universal + WCAG server-side en Club
+    0006_grants.sql             GRANT base a anon/authenticated — ver nota abajo
 
 PRODUCT.md                      Contexto de producto (usuarios, alcance, principios)
 DESIGN.md                       Sistema de diseño construido (tokens, tipografía, componentes)
@@ -63,9 +65,11 @@ npm install
 ```
 
 1. Crea un proyecto en [supabase.com](https://supabase.com) (o usa Supabase CLI local).
-2. Corre las migraciones en orden: `0001_schema.sql`, `0002_rls.sql`,
-   `0003_club_organizer_rpc.sql`, `0004_rating_rpc.sql` (SQL Editor del dashboard, o
-   `supabase db push` con el CLI) — el orden importa, cada una depende de la anterior.
+2. Corre las migraciones en orden: `0001` → `0002` → `0003` → `0004` → `0005` → `0006`
+   (SQL Editor del dashboard, o `supabase db push` con el CLI) — el orden importa, cada
+   una depende de la anterior. Si corres esto por SQL Editor (no por `supabase db push`),
+   **no te saltes `0006`**: sin ella todas las tablas devuelven 401 "permission denied"
+   vía la API aunque el schema y las RLS policies estén perfectos — ver nota abajo.
 3. Copia `apps/web/.env.local.example` a `apps/web/.env.local` y completa con la URL y
    anon key de tu proyecto (Project Settings → API).
 4. `npm run dev` (levanta `apps/web` en `http://localhost:3000`).
@@ -113,6 +117,31 @@ El punto de integración con el resto del sistema es
 todavía porque el Match Engine (confirmación de resultado, Fase 6) no existe aún. Cuando se
 construya, debe invocar esta función en el momento exacto en que `Match.status` pasa a
 `CONFIRMED`, y en ningún otro momento.
+
+## Nota sobre `0005_club_audit_and_contrast.sql`
+
+Dos gaps reales encontrados al revisar `0003`: `update_club_branding` auditaba a mano pero el
+`UPDATE` directo que la RLS de `clubs_update` ya permitía (name/city/address) no dejaba rastro
+en `audit_log`; y la validación WCAG solo vivía en `apps/web/src/lib/color/contrast.ts` — como
+Supabase expone la base directamente, nada impedía saltársela llamando la RPC o un `UPDATE`
+directo. Se resuelve con dos triggers sobre `clubs` (no dentro de cada función, para que
+apliquen sin importar el camino de escritura): `enforce_branding_contrast` reimplementa la
+misma fórmula y los mismos umbrales que `contrast.ts` en SQL, y `audit_clubs_changes` cubre
+INSERT/UPDATE/DELETE. Verificado end-to-end contra un Postgres 16 real (no solo leído): mismos
+números de contraste que el cliente, un `INSERT`/`UPDATE` con mal contraste se rechaza igual
+por cualquiera de los dos caminos, y cada escritura queda en `audit_log`.
+
+## Nota sobre `0006_grants.sql`
+
+Al fin conectar contra el proyecto Supabase real (después de aplicar `0001`-`0005` por SQL
+Editor), toda la API devolvía `401 permission denied for table X` — no un problema de RLS, sino
+que ninguna migración anterior le había dado a `anon`/`authenticated` el `GRANT` de tabla base
+que Postgres exige antes de siquiera evaluar las policies. Es un gap típico de correr SQL crudo
+por el SQL Editor en vez del flujo estándar de Supabase (que auto-otorga esto). `0006` corrige
+esto con `GRANT ... ON ALL TABLES IN SCHEMA public` + `ALTER DEFAULT PRIVILEGES` para que las
+tablas futuras también queden cubiertas — no abre ningún acceso que las policies no permitan ya
+(verificado: tras aplicar el grant, un `INSERT` directo a `rating_events` como `authenticated`
+sigue rechazado, ahora por RLS en vez de por falta de permiso).
 
 ## Qué está construido vs. qué falta
 
