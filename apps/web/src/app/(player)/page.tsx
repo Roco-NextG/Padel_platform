@@ -8,8 +8,12 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
 import { getPlayerProfileForUser } from "@/modules/players/application/getPlayerProfile";
-import { getPendingConfirmationsForPlayer } from "@/modules/matches/application/getMatches";
+import {
+  getPendingConfirmationsForPlayer,
+  getUpcomingMatchForPlayer,
+} from "@/modules/matches/application/getMatches";
 import { PendingConfirmationCard } from "@/modules/matches/ui/pending-confirmation-card";
+import { UpcomingMatchCard } from "@/modules/matches/ui/upcoming-match-card";
 import { RatingBadge } from "@/modules/players/ui/rating-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 
@@ -17,6 +21,7 @@ export default async function PlayerHomePage() {
   const context = await getCurrentUserContext();
   const player = context ? await getPlayerProfileForUser(context.userId) : null;
   const pendingConfirmations = player ? await getPendingConfirmationsForPlayer(player.id) : [];
+  const upcomingMatch = player ? await getUpcomingMatchForPlayer(player.id) : null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -31,11 +36,15 @@ export default async function PlayerHomePage() {
         <h2 id="proximo-partido" className="mb-2 text-sm font-medium text-muted-foreground">
           Próximo partido
         </h2>
-        <EmptyState
-          icon={CalendarBlank}
-          title="Sin partidos programados"
-          description="Cuando te inscribas en un torneo, tu próximo partido va a aparecer aquí con hora, pista y rival."
-        />
+        {upcomingMatch ? (
+          <UpcomingMatchCard match={upcomingMatch} />
+        ) : (
+          <EmptyState
+            icon={CalendarBlank}
+            title="Sin partidos programados"
+            description="Cuando te inscribas en un torneo, tu próximo partido va a aparecer aquí con hora, pista y rival."
+          />
+        )}
       </section>
 
       {pendingConfirmations.length > 0 && (

@@ -42,6 +42,14 @@ export type TournamentStatus =
   | "FINISHED"
   | "CANCELLED"
   | "ARCHIVED";
+export type PhaseType =
+  | "GROUPS"
+  | "ROUND_OF_32"
+  | "ROUND_OF_16"
+  | "QUARTERFINAL"
+  | "SEMIFINAL"
+  | "FINAL"
+  | "CONSOLATION";
 
 /**
  * `tournaments.scoring_config` JSONB shape — mirrors ScoringConfig from
@@ -253,6 +261,46 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["tournaments"]["Insert"]>;
       };
+      tournament_categories: {
+        Relationships: [];
+        Row: {
+          id: string;
+          tournament_id: string;
+          name: string;
+          level: string | null;
+          gender_restriction: GenderType | null;
+          max_teams: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tournament_id: string;
+          name: string;
+          level?: string | null;
+          gender_restriction?: GenderType | null;
+          max_teams?: number | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["tournament_categories"]["Insert"]>;
+      };
+      tournament_phases: {
+        Relationships: [];
+        Row: {
+          id: string;
+          category_id: string;
+          type: PhaseType;
+          order_index: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_id: string;
+          type: PhaseType;
+          order_index: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["tournament_phases"]["Insert"]>;
+      };
       matches: {
         Relationships: [];
         Row: {
@@ -393,6 +441,22 @@ export interface Database {
           p_by_organizer: boolean;
         };
         Returns: Database["public"]["Tables"]["matches"]["Row"];
+      };
+      create_bracket_match: {
+        Args: {
+          p_tournament_id: string;
+          p_phase_id: string;
+          p_round_index: number;
+          p_team_a_id: string;
+          p_team_b_id: string;
+          p_match_type: DbMatchType;
+          p_completed_match_id: string;
+        };
+        Returns: Database["public"]["Tables"]["matches"]["Row"];
+      };
+      finish_tournament: {
+        Args: { p_tournament_id: string; p_completed_match_id: string };
+        Returns: Database["public"]["Tables"]["tournaments"]["Row"];
       };
     };
   };

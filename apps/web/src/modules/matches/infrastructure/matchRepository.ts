@@ -71,6 +71,7 @@ export async function fetchMatchWithContext(matchId: string): Promise<MatchWithC
     matchType: match.match_type,
     tournamentId: match.tournament_id,
     tournamentName,
+    scheduledStart: match.scheduled_start,
     scoringConfig,
     teamA,
     teamB,
@@ -204,4 +205,33 @@ export async function fetchPendingConfirmationsForPlayer(
   const pendingMatchIds = matches.map((m) => m.id).filter((id) => !alreadyResponded.has(id));
   const withContext = await Promise.all(pendingMatchIds.map((id) => fetchMatchWithContext(id)));
   return withContext.filter((m): m is MatchWithContext => m !== null);
+}
+
+/**
+ * El próximo partido del jugador todavía sin jugar (SCHEDULED/IN_PROGRESS),
+ * el más próximo por horario primero — sin horario asignado queda al final,
+ * ya que un bracket recién avanzado (docs/04_TOURNAMENT_ENGINE.md §8) crea
+ * el Match "sin pista/horario" hasta que el organizador lo programe.
+ */
+export async function fetchUpcomingMatchForPlayer(playerId: string): Promise<MatchWithContext | null> {
+  const supabase = await createClient();
+  const { data: memberships, error: membershipError } = await supabase
+    .from("team_members")
+    .select("team_id")
+    .eq("player_id", playerId);
+  if (membershipError) throw new Error(membershipError.message);
+  const teamIds = (memberships ?? []).map((m) => m.team_id);
+  if (teamIds.length === 0) return null;
+
+  const { data: matches, error: matchesError } = await supabase
+    .from("matches")
+    .select("id, scheduled_start")
+    .in("status", ["SCHEDULED", "IN_PROGRESS"])
+    .or(`team_a_id.in.(${teamIds.join(",")}),team_b_id.in.(${teamIds.join(",")})`)
+    .order("scheduled_start", { ascending: true, nullsFirst: false })
+    .limit(1);
+  if (matchesError) throw new Error(matchesError.message);
+  if (!matches || matches.length === 0) return null;
+
+  return fetchMatchWithContext(matches[0].id);
 }

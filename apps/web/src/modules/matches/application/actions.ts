@@ -16,6 +16,7 @@ import {
   isDuplicateRatingEventsError,
   recordRatingEventsForMatch,
 } from "@/modules/rating/application/recordRatingEventsForMatch";
+import { advanceOrFinishBracket } from "@/modules/tournaments/application/advanceOrFinishBracket";
 
 /**
  * The rating side-effect never gets to fail the primary action: the match
@@ -33,6 +34,21 @@ async function recordRatingEventsIgnoringDuplicates(matchId: string): Promise<vo
     if (!isDuplicateRatingEventsError(e)) {
       console.error(`recordRatingEventsForMatch falló para el partido ${matchId}:`, e);
     }
+  }
+}
+
+/**
+ * Igual criterio que recordRatingEventsIgnoringDuplicates: el avance de
+ * cuadro es un efecto secundario de la confirmación, nunca su condición de
+ * éxito. advanceOrFinishBracket ya es un no-op silencioso para partidos sin
+ * fase de bracket (GROUPS o ninguna) — este catch es solo para errores
+ * genuinamente inesperados (ej. create_bracket_match rechazado por RLS).
+ */
+async function advanceBracketIgnoringErrors(matchId: string): Promise<void> {
+  try {
+    await advanceOrFinishBracket(matchId);
+  } catch (e) {
+    console.error(`advanceOrFinishBracket falló para el partido ${matchId}:`, e);
   }
 }
 
@@ -111,6 +127,7 @@ export async function submitMatchResultAction(
 
   if (updated.status === "CONFIRMED") {
     await recordRatingEventsIgnoringDuplicates(matchId);
+    await advanceBracketIgnoringErrors(matchId);
   }
 
   revalidatePath(`/dashboard/partidos/${matchId}`);
@@ -138,6 +155,7 @@ async function respondToMatch(matchId: string, confirmed: boolean): Promise<Matc
   const status = await fetchMatchStatus(matchId);
   if (status === "CONFIRMED") {
     await recordRatingEventsIgnoringDuplicates(matchId);
+    await advanceBracketIgnoringErrors(matchId);
   }
 
   revalidatePath("/");

@@ -3,6 +3,7 @@ import {
   fetchMatchWithContext,
   fetchOrganizerMatches,
   fetchPendingConfirmationsForPlayer,
+  fetchUpcomingMatchForPlayer,
 } from "../infrastructure/matchRepository";
 import type { MatchConfirmationState, MatchWithContext } from "../domain/match";
 
@@ -24,4 +25,8 @@ export async function getOrganizerMatchList() {
 
 export async function getPendingConfirmationsForPlayer(playerId: string): Promise<MatchWithContext[]> {
   return fetchPendingConfirmationsForPlayer(playerId);
+}
+
+export async function getUpcomingMatchForPlayer(playerId: string): Promise<MatchWithContext | null> {
+  return fetchUpcomingMatchForPlayer(playerId);
 }

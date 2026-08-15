@@ -47,6 +47,7 @@ export interface MatchWithContext {
   matchType: string;
   tournamentId: string | null;
   tournamentName: string | null;
+  scheduledStart: string | null;
   scoringConfig: ScoringConfig;
   teamA: MatchTeam;
   teamB: MatchTeam;
