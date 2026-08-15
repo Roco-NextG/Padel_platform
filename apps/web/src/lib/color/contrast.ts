@@ -81,3 +81,23 @@ export function validateBrandingContrast(colors: {
   }
   return issues;
 }
+
+const CONTRAST_PAIR_LABELS: Record<BrandingContrastIssue["pair"], string> = {
+  "primary-on-white": "Color primario sobre fondo claro",
+  "primary-on-black": "Color primario sobre fondo oscuro",
+  "secondary-on-white": "Color secundario sobre fondo claro",
+  "accent-on-white": "Acento sobre fondo claro",
+};
+
+/**
+ * Human-readable version of a client-side contrast check, naming exactly
+ * which pair failed and by how much — same wording the server-side trigger
+ * uses (supabase/migrations/0005_club_audit_and_contrast.sql), so a client
+ * rejection and a server rejection never read like two different features.
+ */
+export function formatContrastIssues(issues: BrandingContrastIssue[]): string {
+  const detail = issues
+    .map((i) => `${CONTRAST_PAIR_LABELS[i.pair]}: contraste ${i.ratio.toFixed(2)} (mínimo ${i.required})`)
+    .join(" · ");
+  return `El branding no cumple el contraste mínimo (WCAG AA). ${detail}. Elige tonos más oscuros o más saturados.`;
+}

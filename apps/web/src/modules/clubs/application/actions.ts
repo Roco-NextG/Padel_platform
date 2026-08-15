@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClubSchema, clubBrandingSchema } from "../domain/club";
+import { createClubSchema, clubBrandingSchema, parseBrandingContrastError } from "../domain/club";
 import { createClub, updateClubBranding, fetchManagedClub } from "../infrastructure/clubRepository";
-import { validateBrandingContrast } from "@/lib/color/contrast";
+import { validateBrandingContrast, formatContrastIssues } from "@/lib/color/contrast";
 import { fetchAuthenticatedUser } from "@/modules/auth/infrastructure/authRepository";
 
 export interface ClubActionState {
@@ -35,6 +35,8 @@ export async function createClubAction(
         success: false,
       };
     }
+    const contrastError = parseBrandingContrastError(message);
+    if (contrastError) return { error: contrastError, success: false };
     return { error: "No se pudo crear el club. Intenta de nuevo.", success: false };
   }
 
@@ -59,17 +61,17 @@ export async function updateClubBrandingAction(
     return { error: parsed.error.issues[0]?.message ?? "Revisa los colores ingresados.", success: false };
   }
 
+  // Feedback inmediato mientras el usuario elige colores. No es el único
+  // guardián: enforce_branding_contrast (0005_club_audit_and_contrast.sql)
+  // valida lo mismo en la base de datos y gana si alguna vez divergen — ver
+  // el catch de abajo.
   const issues = validateBrandingContrast({
     primaryColor: parsed.data.primaryColor,
     secondaryColor: parsed.data.secondaryColor || null,
     accentColor: parsed.data.accentColor || null,
   });
   if (issues.length > 0) {
-    return {
-      error:
-        "Ese color no cumple el contraste mínimo (WCAG AA) sobre fondo claro u oscuro. Elige un tono más oscuro o más saturado.",
-      success: false,
-    };
+    return { error: formatContrastIssues(issues), success: false };
   }
 
   const club = await fetchManagedClub(user.id);
@@ -82,7 +84,10 @@ export async function updateClubBrandingAction(
       accent: parsed.data.accentColor || null,
       logo_url: parsed.data.logoUrl || null,
     });
-  } catch {
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "";
+    const contrastError = parseBrandingContrastError(message);
+    if (contrastError) return { error: contrastError, success: false };
     return { error: "No se pudo guardar el branding. Intenta de nuevo.", success: false };
   }
 

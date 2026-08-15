@@ -160,7 +160,23 @@ AuditLog (
 )
 ```
 
-Obligatorio en escrituras a: `Match` (resultado), `RatingEvent`, `Team`/bracket, `Player`, cualquier operación de `Admin`.
+Obligatorio en escrituras a: `Match` (resultado), `RatingEvent`, `Team`/bracket, `Player`, `Club`, cualquier operación de `Admin`.
+
+**Cómo se garantiza (no solo se documenta):** el primer caso implementado, `Club`
+(`supabase/migrations/0005_club_audit_and_contrast.sql`), usa un **trigger de tabla**
+(`audit_clubs_changes`, `AFTER INSERT OR UPDATE OR DELETE`, `security definer` — necesario porque
+`audit_log` no tiene policy de insert para `authenticated`) en vez de dejar que cada función RPC
+inserte manualmente en `audit_log`. La razón: la policy RLS `clubs_update` permite un `UPDATE`
+directo de columnas como `branding` sin pasar por ninguna RPC — una auditoría "por convención"
+(cada función nueva se acuerda de insertar en `audit_log`) se salta ese camino en cuanto alguien
+lo usa, mientras que un trigger de tabla se aplica sin importar cómo llegó la escritura. Mismo
+razonamiento aplicado al mismo tiempo a la validación de contraste WCAG del branding (ver
+`07_UX_UI_ARCHITECTURE.md` §4): ambas reglas viven como trigger sobre `clubs`, no dentro de
+`create_club`/`update_club_branding`.
+
+Este es el patrón de referencia para cuando `Match`/`RatingEvent`/`Team` necesiten lo mismo: si
+una tabla es escribible por más de un camino (RPC *y* RLS directa), la garantía dura va en un
+trigger de esa tabla, no repetida dentro de cada función que escribe en ella.
 
 ---
 
