@@ -8,12 +8,15 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
 import { getPlayerProfileForUser } from "@/modules/players/application/getPlayerProfile";
+import { getPendingConfirmationsForPlayer } from "@/modules/matches/application/getMatches";
+import { PendingConfirmationCard } from "@/modules/matches/ui/pending-confirmation-card";
 import { RatingBadge } from "@/modules/players/ui/rating-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export default async function PlayerHomePage() {
   const context = await getCurrentUserContext();
   const player = context ? await getPlayerProfileForUser(context.userId) : null;
+  const pendingConfirmations = player ? await getPendingConfirmationsForPlayer(player.id) : [];
 
   return (
     <div className="flex flex-col gap-8">
@@ -34,6 +37,19 @@ export default async function PlayerHomePage() {
           description="Cuando te inscribas en un torneo, tu próximo partido va a aparecer aquí con hora, pista y rival."
         />
       </section>
+
+      {pendingConfirmations.length > 0 && (
+        <section aria-labelledby="resultados-por-confirmar">
+          <h2 id="resultados-por-confirmar" className="mb-2 text-sm font-medium text-muted-foreground">
+            Resultados por confirmar
+          </h2>
+          <div className="flex flex-col gap-3">
+            {pendingConfirmations.map((match) => (
+              <PendingConfirmationCard key={match.id} match={match} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section aria-labelledby="torneo-actual">
         <h2 id="torneo-actual" className="mb-2 text-sm font-medium text-muted-foreground">

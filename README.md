@@ -14,7 +14,8 @@ apps/
       app/
         (auth)/                /login, /registro — split-screen, brand panel fijo en dark
         (player)/               /, /perfil, /torneos, /ranking, /jugar — mobile-first, bottom nav
-        (club)/                /dashboard, /dashboard/club, /dashboard/organizador, ... — desktop-first, sidebar
+        (club)/                /dashboard, /dashboard/club, /dashboard/organizador,
+                                /dashboard/partidos(/[matchId]) — desktop-first, sidebar
         proxy.ts                Next 16: reemplaza a middleware.ts — refresca sesión + gatea rutas
       modules/
         auth/       domain (roles, schemas) · application (actions, casos de uso) · infrastructure (Supabase)
@@ -22,6 +23,8 @@ apps/
         clubs/      idem — CRUD de club + branding (con validación de contraste WCAG AA)
         organizers/ idem — CRUD de organizador
         rating/     application (recordRatingEventsForMatch) · infrastructure (Supabase) — ver nota abajo
+        matches/    domain (submission schema, scoring config parser) · application (submit/confirm/reject
+                    actions, dispara recordRatingEventsForMatch al confirmar) · infrastructure (Supabase)
       lib/
         supabase/    client.ts (browser) · server.ts (RSC/actions) · session.ts (proxy helper) · database.types.ts
         color/       contrast.ts — validador WCAG AA para branding de club
@@ -32,6 +35,9 @@ packages/
                                  27 tests, ver packages/tournament-engine/README.md
   rating-engine/                Lógica pura: Glicko-2 adaptado + efecto compañero desde el día 1.
                                  22 tests, ver packages/rating-engine/README.md
+  match-engine/                 Lógica pura: validación de scoring, máquina de estados,
+                                 flujo de confirmación con discrepancia. 36 tests, ver
+                                 packages/match-engine/README.md
 
 supabase/
   migrations/
@@ -41,6 +47,7 @@ supabase/
     0004_rating_rpc.sql         record_rating_events — único punto de escritura de rating_events
     0005_club_audit_and_contrast.sql  triggers: auditoría universal + WCAG server-side en Club
     0006_grants.sql             GRANT base a anon/authenticated — ver nota abajo
+    0007_match_engine_rpc.sql   submit_match_result real + sync de match_confirmations — ver nota abajo
 
 PRODUCT.md                      Contexto de producto (usuarios, alcance, principios)
 DESIGN.md                       Sistema de diseño construido (tokens, tipografía, componentes)
@@ -48,7 +55,7 @@ DESIGN.md                       Sistema de diseño construido (tokens, tipograf�
 
 `packages/*` compilan a `dist/` (no está en git). `npm run dev` y `npm run build` en la raíz
 ya lo hacen por ti; si corres algo dentro de `apps/web` directamente, compila los packages
-primero (`npm run build -w packages/tournament-engine -w packages/rating-engine`).
+primero (`npm run build -w packages/tournament-engine -w packages/rating-engine -w packages/match-engine`).
 
 ## Stack
 
@@ -65,7 +72,7 @@ npm install
 ```
 
 1. Crea un proyecto en [supabase.com](https://supabase.com) (o usa Supabase CLI local).
-2. Corre las migraciones en orden: `0001` → `0002` → `0003` → `0004` → `0005` → `0006`
+2. Corre las migraciones en orden: `0001` → `0002` → `0003` → `0004` → `0005` → `0006` → `0007`
    (SQL Editor del dashboard, o `supabase db push` con el CLI) — el orden importa, cada
    una depende de la anterior. Si corres esto por SQL Editor (no por `supabase db push`),
    **no te saltes `0006`**: sin ella todas las tablas devuelven 401 "permission denied"
@@ -143,21 +150,56 @@ tablas futuras también queden cubiertas — no abre ningún acceso que las poli
 (verificado: tras aplicar el grant, un `INSERT` directo a `rating_events` como `authenticated`
 sigue rechazado, ahora por RLS en vez de por falta de permiso).
 
+## Nota sobre `0007_match_engine_rpc.sql`
+
+Completa el stub de `submit_match_result` que 0002_rls.sql dejó pendiente ("Fase 6 — Match
+Engine"). `packages/match-engine` es lógica pura (validación de scoring contra
+`tournaments.scoring_config`, máquina de estados, discrepancia entre registros — ver su
+README) y no se reimplementa ni recalibra: `validateMatchResult` corre en la capa de
+aplicación (`modules/matches/application/actions.ts`) ANTES de tocar la base, y la RPC nunca
+repite esa validación — solo autoriza, persiste y transiciona el estado.
+
+Dos caminos que conviven (docs/06_MATCH_ENGINE.md §3): el organizador confirma directo; un
+jugador registra y queda `PENDING_CONFIRMATION` con él mismo auto-confirmado (los otros 3 no
+se pre-crean como filas en `match_confirmations` — la ausencia de fila ES el estado
+"pendiente", ya que la columna `confirmed` es `boolean not null`, sin hueco para un tercer
+valor). La confirmación/rechazo de cada jugador es un INSERT/UPDATE directo desde el cliente
+(RLS `match_confirmations_write` ya lo permite) — un trigger nuevo,
+`sync_match_status_from_confirmations`, agrega esas respuestas y decide CONFIRMED/DISPUTED,
+mismo patrón que 0005 (trigger de tabla en vez de lógica repetida por camino de escritura). Un
+admin puede resolver un `DISPUTED` re-enviando el resultado correcto por el mismo camino que
+el organizador.
+
+Cuando `submit_match_result` o el trigger de confirmaciones dejan un partido en `CONFIRMED`,
+la capa de aplicación llama a `recordRatingEventsForMatch` (el punto de integración que había
+quedado listo pero sin disparador desde la fase anterior) — el rating se actualiza en el mismo
+flujo, nunca por separado.
+
+Verificado end-to-end contra un Postgres 16 real, no solo leído: registro directo del
+organizador, registro por jugador con auto-confirmación, confirmaciones parciales que no
+avanzan el estado, la cuarta confirmación disparando `CONFIRMED` vía trigger, un rechazo
+disparando `DISPUTED`, un jugador sin relación con el partido rechazado, un admin resolviendo
+la disputa, y confirmando que RLS sigue bloqueando la escritura directa a `matches`/`set_scores`
+sin pasar por la RPC.
+
 ## Qué está construido vs. qué falta
 
 **Construido en esta fase:** Auth (registro, login, roles, RBAC vía RLS), CRUD de
-Player/Club/Organizer, shells de Player (mobile) y Club/Organizer (desktop), y la integración
-del Rating Engine (lectura de equipos/jugadores, cómputo puro, persistencia vía RPC, rating +
-confianza visibles en perfil y home) — lista para que el Match Engine la dispare.
+Player/Club/Organizer, shells de Player (mobile) y Club/Organizer (desktop), la integración
+del Rating Engine, y ahora el Match Engine conectado: `/dashboard/partidos` (lista, RLS-scoped)
+y `/dashboard/partidos/[matchId]` (registro de resultado, confirmaciones) para el organizador;
+"Resultados por confirmar" con confirmar/rechazar en el home del jugador. Confirmar un partido
+dispara automáticamente el Rating Engine.
 
 **No construido todavía** (ver `docs/10_ROADMAP.md` — son las próximas fases): Tournament
-Engine conectado a UI/DB, Match Engine (validación de scoring, confirmación de 4 jugadores),
-Discovery, Content Composer, Admin panel.
+Engine conectado a UI/DB (por eso no hay forma de crear un torneo/partido real desde la UI
+todavía — las pantallas de Match Engine funcionan correctas mostrando sus estados vacíos hasta
+que existan datos), Discovery, Content Composer, Admin panel.
 
 ## Tests
 
 ```bash
-npm run test          # tournament-engine (27 tests) + rating-engine (22 tests), vitest
+npm run test          # tournament-engine (27) + rating-engine (22) + match-engine (36), vitest
 npm run build          # compila los packages + build de producción de apps/web (incluye typecheck)
 npm run lint            # eslint de apps/web
 ```

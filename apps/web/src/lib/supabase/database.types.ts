@@ -1,12 +1,12 @@
 /**
  * Hand-written subset of the generated Supabase types, covering the tables
- * touched so far (Auth, Players, Clubs, Organizers, plus the Teams/Matches/
- * SetScores/RatingEvents slice needed to wire the Rating Engine — see
- * supabase/migrations/0001_schema.sql). Tournament lifecycle tables
- * (tournaments, tournament_categories/groups/phases) and the Match Engine's
- * own flow (match_confirmations) still aren't typed here — add them when
- * those modules get built. Once the project is linked to a live Supabase
- * instance, consider replacing this file with the real output of:
+ * touched so far (Auth, Players, Clubs, Organizers, Teams/Matches/SetScores/
+ * RatingEvents/MatchConfirmations, a minimal Tournaments slice for
+ * scoring_config — see supabase/migrations/0001_schema.sql). Tournament
+ * lifecycle tables beyond that (categories/groups/phases) still aren't
+ * typed here — add them when the Tournament Engine gets wired to the DB.
+ * Once the project is linked to a live Supabase instance, consider
+ * replacing this file with the real output of:
  *
  *   supabase gen types typescript --project-id <id> > src/lib/supabase/database.types.ts
  */
@@ -33,6 +33,30 @@ export type MatchStatus =
   | "CANCELLED";
 export type DbMatchType = "TOURNAMENT" | "COMPETITIVE" | "CASUAL";
 export type RatingReason = "TOURNAMENT_MATCH" | "COMPETITIVE_MATCH";
+export type TournamentStatus =
+  | "DRAFT"
+  | "PUBLISHED"
+  | "REGISTRATION_OPEN"
+  | "REGISTRATION_CLOSED"
+  | "IN_PROGRESS"
+  | "FINISHED"
+  | "CANCELLED"
+  | "ARCHIVED";
+
+/**
+ * `tournaments.scoring_config` JSONB shape — mirrors ScoringConfig from
+ * @padel-platform/match-engine field-for-field (no translation layer needed).
+ * Not fixed by the schema itself (`jsonb not null default '{}'::jsonb`), so
+ * this is the shape this codebase defines and expects; a tournament that
+ * hasn't configured it yet gets `{}`, parsed against DEFAULT_SCORING_CONFIG.
+ */
+export interface ScoringConfigJson {
+  setsToWin?: number;
+  gamesPerSet?: number;
+  tiebreakPoints?: number;
+  finalSetMode?: "REGULAR" | "SUPER_TIEBREAK";
+  superTiebreakPoints?: number;
+}
 
 export interface ClubBranding {
   logo_url?: string | null;
@@ -194,6 +218,41 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["team_members"]["Insert"]>;
       };
+      tournaments: {
+        Relationships: [];
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          logo_url: string | null;
+          cover_image_url: string | null;
+          organizer_id: string;
+          club_id: string;
+          status: TournamentStatus;
+          is_published: boolean;
+          start_date: string | null;
+          end_date: string | null;
+          scoring_config: ScoringConfigJson;
+          tiebreak_rules: string[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          logo_url?: string | null;
+          cover_image_url?: string | null;
+          organizer_id: string;
+          club_id: string;
+          status?: TournamentStatus;
+          is_published?: boolean;
+          start_date?: string | null;
+          end_date?: string | null;
+          scoring_config?: ScoringConfigJson;
+        };
+        Update: Partial<Database["public"]["Tables"]["tournaments"]["Insert"]>;
+      };
       matches: {
         Relationships: [];
         Row: {
@@ -256,6 +315,25 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["set_scores"]["Insert"]>;
       };
+      match_confirmations: {
+        Relationships: [];
+        Row: {
+          id: string;
+          match_id: string;
+          player_id: string;
+          confirmed: boolean;
+          confirmed_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          match_id: string;
+          player_id: string;
+          confirmed: boolean;
+          confirmed_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["match_confirmations"]["Insert"]>;
+      };
       rating_events: {
         Relationships: [];
         Row: {
@@ -307,8 +385,26 @@ export interface Database {
         Args: { p_events: RatingEventRpcInput[] };
         Returns: Database["public"]["Tables"]["rating_events"]["Row"][];
       };
+      submit_match_result: {
+        Args: {
+          p_match_id: string;
+          p_sets: SetScoreRpcInput[];
+          p_winner: "A" | "B";
+          p_by_organizer: boolean;
+        };
+        Returns: Database["public"]["Tables"]["matches"]["Row"];
+      };
     };
   };
+}
+
+/** Shape sent to submit_match_result — mirrors SetScoreInput from @padel-platform/match-engine. */
+export interface SetScoreRpcInput {
+  setNumber: number;
+  teamAGames: number;
+  teamBGames: number;
+  tiebreakA?: number | null;
+  tiebreakB?: number | null;
 }
 
 /** Shape sent to the record_rating_events RPC — mirrors RatingEventOutput from @padel-platform/rating-engine. */
