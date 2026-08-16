@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { UsersThree } from "@phosphor-icons/react/dist/ssr";
 import { getTournamentDetail } from "@/modules/tournaments/application/getTournaments";
 import { getBracketView } from "@/modules/tournaments/application/getBracket";
+import { getGroupStandingsForCategory } from "@/modules/tournaments/application/getGroupStandings";
+import type { CategorySummary } from "@/modules/tournaments/infrastructure/tournamentRepository";
 import { GenerateBracketButton } from "@/modules/tournaments/ui/generate-bracket-button";
+import { FormGroupsButton } from "@/modules/tournaments/ui/form-groups-button";
+import { GroupStandingsTable } from "@/modules/tournaments/ui/group-standings-table";
 import { BracketView } from "@/modules/tournaments/ui/bracket-view";
 import { TournamentStatusBadge } from "@/modules/tournaments/ui/tournament-status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -57,9 +61,11 @@ async function CategorySection({
 }: {
   tournamentId: string;
   categoryId: string;
-  category: { name: string; level: string | null; teamCount: number; hasBracket: boolean };
+  category: CategorySummary;
 }) {
   const rounds = category.hasBracket ? await getBracketView(categoryId) : [];
+  const groupStandings =
+    category.usesGroupStage && category.hasGroups ? await getGroupStandingsForCategory(categoryId) : [];
 
   return (
     <section className="flex flex-col gap-4">
@@ -69,28 +75,105 @@ async function CategorySection({
           <p className="text-sm text-muted-foreground">
             {category.level ? `${category.level} · ` : ""}
             {category.teamCount} {category.teamCount === 1 ? "equipo inscrito" : "equipos inscritos"}
+            {category.usesGroupStage ? " · Fase de grupos" : ""}
           </p>
         </div>
-        {!category.hasBracket && category.teamCount >= 2 && (
-          <GenerateBracketButton tournamentId={tournamentId} categoryId={categoryId} />
-        )}
       </div>
 
       {category.hasBracket ? (
-        <BracketView rounds={rounds} />
-      ) : category.teamCount < 2 ? (
+        <div className="flex flex-col gap-6">
+          {groupStandings.length > 0 && (
+            <details>
+              <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
+                Ver clasificación de grupos
+              </summary>
+              <div className="mt-3 flex flex-col gap-6">
+                {groupStandings.map((g) => (
+                  <GroupStandingsTable key={g.groupId} group={g} />
+                ))}
+              </div>
+            </details>
+          )}
+          <BracketView rounds={rounds} />
+        </div>
+      ) : category.usesGroupStage ? (
+        <GroupStageSection tournamentId={tournamentId} categoryId={categoryId} category={category} groupStandings={groupStandings} />
+      ) : (
+        <DirectBracketSection tournamentId={tournamentId} categoryId={categoryId} category={category} />
+      )}
+    </section>
+  );
+}
+
+function DirectBracketSection({
+  tournamentId,
+  categoryId,
+  category,
+}: {
+  tournamentId: string;
+  categoryId: string;
+  category: CategorySummary;
+}) {
+  if (category.teamCount < 2) {
+    return (
+      <EmptyState
+        icon={UsersThree}
+        title="Faltan equipos"
+        description="Se necesitan al menos 2 equipos inscritos en esta categoría para generar el cuadro."
+      />
+    );
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      <GenerateBracketButton tournamentId={tournamentId} categoryId={categoryId} />
+      <EmptyState
+        icon={UsersThree}
+        title="Todavía no se generó el cuadro"
+        description="Cuando cierres las inscripciones, generá el cuadro directo de eliminación simple para esta categoría."
+      />
+    </div>
+  );
+}
+
+function GroupStageSection({
+  tournamentId,
+  categoryId,
+  category,
+  groupStandings,
+}: {
+  tournamentId: string;
+  categoryId: string;
+  category: CategorySummary;
+  groupStandings: Awaited<ReturnType<typeof getGroupStandingsForCategory>>;
+}) {
+  if (!category.hasGroups) {
+    if (category.teamCount < 3) {
+      return (
         <EmptyState
           icon={UsersThree}
           title="Faltan equipos"
-          description="Se necesitan al menos 2 equipos inscritos en esta categoría para generar el cuadro."
+          description="Se necesitan al menos 3 equipos inscritos en esta categoría para formar grupos."
         />
+      );
+    }
+    return <FormGroupsButton tournamentId={tournamentId} categoryId={categoryId} />;
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
+        {groupStandings.map((g) => (
+          <GroupStandingsTable key={g.groupId} group={g} />
+        ))}
+      </div>
+      {category.allGroupMatchesConfirmed ? (
+        <GenerateBracketButton tournamentId={tournamentId} categoryId={categoryId} />
       ) : (
-        <EmptyState
-          icon={UsersThree}
-          title="Todavía no se generó el cuadro"
-          description="Cuando cierres las inscripciones, generá el cuadro directo de eliminación simple para esta categoría."
-        />
+        <p className="text-sm text-muted-foreground">
+          Todavía hay partidos de grupo sin confirmar — el cuadro se puede generar cuando todos estén
+          confirmados.
+        </p>
       )}
-    </section>
+    </div>
   );
 }

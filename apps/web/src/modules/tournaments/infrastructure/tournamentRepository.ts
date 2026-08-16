@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Database, DbMatchType, GenderType, PhaseType } from "@/lib/supabase/database.types";
+import type { MatchResult } from "@padel-platform/tournament-engine";
 
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
 type TournamentRow = Database["public"]["Tables"]["tournaments"]["Row"];
 type PhaseRow = Database["public"]["Tables"]["tournament_phases"]["Row"];
+type TournamentGroupRow = Database["public"]["Tables"]["tournament_groups"]["Row"];
 
 /** RLS ya scopea esto a lo que el caller administra + torneos publicados — misma lógica que fetchOrganizerMatches. */
 export async function fetchTournamentsForOrganizerView(): Promise<TournamentRow[]> {
@@ -29,7 +31,10 @@ export interface CategorySummary {
   level: string | null;
   genderRestriction: GenderType | null;
   maxTeams: number | null;
+  usesGroupStage: boolean;
   teamCount: number;
+  hasGroups: boolean;
+  allGroupMatchesConfirmed: boolean;
   hasBracket: boolean;
 }
 
@@ -44,12 +49,14 @@ export async function fetchCategoriesWithSummary(tournamentId: string): Promise<
   if (!categories || categories.length === 0) return [];
 
   const categoryIds = categories.map((c) => c.id);
-  const [teamsResult, phasesResult] = await Promise.all([
+  const [teamsResult, phasesResult, groupsResult] = await Promise.all([
     supabase.from("teams").select("id, tournament_category_id").in("tournament_category_id", categoryIds),
-    supabase.from("tournament_phases").select("category_id").in("category_id", categoryIds),
+    supabase.from("tournament_phases").select("category_id, type").in("category_id", categoryIds),
+    supabase.from("tournament_groups").select("id, category_id").in("category_id", categoryIds),
   ]);
   if (teamsResult.error) throw new Error(teamsResult.error.message);
   if (phasesResult.error) throw new Error(phasesResult.error.message);
+  if (groupsResult.error) throw new Error(groupsResult.error.message);
 
   const teamCountByCategory = new Map<string, number>();
   for (const t of teamsResult.data ?? []) {
@@ -59,20 +66,55 @@ export async function fetchCategoriesWithSummary(tournamentId: string): Promise<
       (teamCountByCategory.get(t.tournament_category_id) ?? 0) + 1
     );
   }
-  const categoriesWithPhases = new Set((phasesResult.data ?? []).map((p) => p.category_id));
 
-  return categories.map((c) => ({
-    id: c.id,
-    name: c.name,
-    level: c.level,
-    genderRestriction: c.gender_restriction,
-    maxTeams: c.max_teams,
-    teamCount: teamCountByCategory.get(c.id) ?? 0,
-    hasBracket: categoriesWithPhases.has(c.id),
-  }));
+  // hasBracket = existe alguna fase de RONDA (no la fase GROUPS) — con fase
+  // de grupos, la categoría siempre tiene AL MENOS la fase GROUPS antes de
+  // tener bracket, así que "cualquier fase" ya no alcanza para distinguir.
+  const categoriesWithBracketPhase = new Set(
+    (phasesResult.data ?? []).filter((p) => p.type !== "GROUPS").map((p) => p.category_id)
+  );
+
+  const groupIdsByCategory = new Map<string, string[]>();
+  for (const g of groupsResult.data ?? []) {
+    const list = groupIdsByCategory.get(g.category_id) ?? [];
+    list.push(g.id);
+    groupIdsByCategory.set(g.category_id, list);
+  }
+
+  const allGroupIds = (groupsResult.data ?? []).map((g) => g.id);
+  const groupIdsWithUnconfirmedMatches = new Set<string>();
+  if (allGroupIds.length > 0) {
+    const { data: unconfirmed, error: unconfirmedError } = await supabase
+      .from("matches")
+      .select("group_id")
+      .in("group_id", allGroupIds)
+      .neq("status", "CONFIRMED");
+    if (unconfirmedError) throw new Error(unconfirmedError.message);
+    for (const m of unconfirmed ?? []) {
+      if (m.group_id) groupIdsWithUnconfirmedMatches.add(m.group_id);
+    }
+  }
+
+  return categories.map((c) => {
+    const groupIds = groupIdsByCategory.get(c.id) ?? [];
+    const hasGroups = groupIds.length > 0;
+    return {
+      id: c.id,
+      name: c.name,
+      level: c.level,
+      genderRestriction: c.gender_restriction,
+      maxTeams: c.max_teams,
+      usesGroupStage: c.uses_group_stage,
+      teamCount: teamCountByCategory.get(c.id) ?? 0,
+      hasGroups,
+      allGroupMatchesConfirmed:
+        hasGroups && groupIds.every((id) => !groupIdsWithUnconfirmedMatches.has(id)),
+      hasBracket: categoriesWithBracketPhase.has(c.id),
+    };
+  });
 }
 
-async function fetchTeamNames(teamIds: string[]): Promise<Map<string, string>> {
+export async function fetchTeamNames(teamIds: string[]): Promise<Map<string, string>> {
   if (teamIds.length === 0) return new Map();
   const supabase = await createClient();
   const { data: members, error } = await supabase
@@ -177,15 +219,162 @@ export async function fetchBracketForCategory(categoryId: string): Promise<Brack
   });
 }
 
-export async function fetchCategoryTournamentId(categoryId: string): Promise<string | null> {
+export interface CategoryContext {
+  tournamentId: string;
+  usesGroupStage: boolean;
+}
+
+export async function fetchCategoryContext(categoryId: string): Promise<CategoryContext | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tournament_categories")
-    .select("tournament_id")
+    .select("tournament_id, uses_group_stage")
     .eq("id", categoryId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return data?.tournament_id ?? null;
+  if (!data) return null;
+  return { tournamentId: data.tournament_id, usesGroupStage: data.uses_group_stage };
+}
+
+/** Directo vía RLS (`tournament_groups_write`, is_tournament_manager) — la formación de grupos siempre la dispara el organizador. */
+export async function insertGroups(
+  categoryId: string,
+  names: string[]
+): Promise<Pick<TournamentGroupRow, "id" | "name">[]> {
+  if (names.length === 0) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournament_groups")
+    .insert(names.map((name) => ({ category_id: categoryId, name })))
+    .select("id, name");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function fetchGroupsForCategory(
+  categoryId: string
+): Promise<Pick<TournamentGroupRow, "id" | "name">[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournament_groups")
+    .select("id, name")
+    .eq("category_id", categoryId)
+    .order("name");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function fetchTeamsForGroup(groupId: string): Promise<string[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("teams").select("id").eq("group_id", groupId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((t) => t.id);
+}
+
+/**
+ * Bulk upsert de un solo campo (`group_id`) — el UPSERT de Postgres solo
+ * toca las columnas presentes en el payload, así que `tournament_category_id`
+ * y `seed` de cada Team quedan intactos.
+ */
+export async function updateTeamGroups(
+  assignments: { teamId: string; groupId: string }[]
+): Promise<void> {
+  if (assignments.length === 0) return;
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("teams")
+    .upsert(
+      assignments.map((a) => ({ id: a.teamId, group_id: a.groupId })),
+      { onConflict: "id" }
+    );
+  if (error) throw new Error(error.message);
+}
+
+export interface GroupMatchInsert {
+  tournamentId: string;
+  phaseId: string;
+  groupId: string;
+  teamAId: string;
+  teamBId: string;
+  matchType: DbMatchType;
+}
+
+/** Directo vía RLS (`matches_write`) — igual que insertMatches, disparado solo por el organizador. round_index queda null: no tiene significado para un partido de grupo. */
+export async function insertGroupMatches(rows: GroupMatchInsert[]): Promise<MatchRow[]> {
+  if (rows.length === 0) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("matches")
+    .insert(
+      rows.map((r) => ({
+        tournament_id: r.tournamentId,
+        phase_id: r.phaseId,
+        group_id: r.groupId,
+        team_a_id: r.teamAId,
+        team_b_id: r.teamBId,
+        match_type: r.matchType,
+      }))
+    )
+    .select("*");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/** true si el grupo (o la categoría entera) todavía no tiene ningún Match sin confirmar — sin partidos, se considera que faltan grupos, no que ya terminaron. */
+export async function areAllGroupMatchesConfirmed(categoryId: string): Promise<boolean> {
+  const groups = await fetchGroupsForCategory(categoryId);
+  if (groups.length === 0) return false;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("matches")
+    .select("id")
+    .in(
+      "group_id",
+      groups.map((g) => g.id)
+    )
+    .neq("status", "CONFIRMED")
+    .limit(1);
+  if (error) throw new Error(error.message);
+  return (data ?? []).length === 0;
+}
+
+/** Arma el MatchResult[] que calculateStandings() espera, a partir de los Match CONFIRMED de un grupo y sus SetScore — nunca se inventa un resultado, un Match sin winner_team_id o sin equipos asignados simplemente no entra en el cálculo. */
+export async function fetchConfirmedGroupMatchResults(groupId: string): Promise<MatchResult[]> {
+  const supabase = await createClient();
+  const { data: matches, error } = await supabase
+    .from("matches")
+    .select("id, team_a_id, team_b_id, winner_team_id")
+    .eq("group_id", groupId)
+    .eq("status", "CONFIRMED");
+  if (error) throw new Error(error.message);
+  if (!matches || matches.length === 0) return [];
+
+  const { data: sets, error: setsError } = await supabase
+    .from("set_scores")
+    .select("match_id, team_a_games, team_b_games")
+    .in(
+      "match_id",
+      matches.map((m) => m.id)
+    );
+  if (setsError) throw new Error(setsError.message);
+
+  return matches
+    .filter(
+      (m): m is typeof m & { team_a_id: string; team_b_id: string; winner_team_id: string } =>
+        m.team_a_id != null && m.team_b_id != null && m.winner_team_id != null
+    )
+    .map((m) => {
+      const matchSets = (sets ?? []).filter((s) => s.match_id === m.id);
+      return {
+        teamAId: m.team_a_id,
+        teamBId: m.team_b_id,
+        winnerId: m.winner_team_id,
+        setsWonA: matchSets.filter((s) => s.team_a_games > s.team_b_games).length,
+        setsWonB: matchSets.filter((s) => s.team_b_games > s.team_a_games).length,
+        gamesWonA: matchSets.reduce((sum, s) => sum + s.team_a_games, 0),
+        gamesWonB: matchSets.reduce((sum, s) => sum + s.team_b_games, 0),
+      };
+    });
 }
 
 /** Todo equipo inscrito en la categoría — sin fase de grupos, "inscrito" es la única noción de participante. */

@@ -1,19 +1,47 @@
-import { generateBracket, initializeBracketRounds } from "@padel-platform/tournament-engine";
+import type { GroupStanding, SeededTeam } from "@padel-platform/tournament-engine";
+import { balancedSeeding, calculateStandings, generateBracket, initializeBracketRounds } from "@padel-platform/tournament-engine";
 import { buildSeededTeams, phaseTypeForRound } from "../domain/bracket";
 import {
-  fetchCategoryTournamentId,
+  areAllGroupMatchesConfirmed,
+  fetchCategoryContext,
+  fetchConfirmedGroupMatchResults,
   fetchEnrolledTeams,
+  fetchGroupsForCategory,
+  fetchTeamsForGroup,
   insertMatches,
   insertPhases,
   type BracketMatchInsert,
 } from "../infrastructure/tournamentRepository";
 
 /**
- * Generación inicial del cuadro directo (docs/04_TOURNAMENT_ENGINE.md §8,
- * fuera de alcance la fase de grupos). Arranca de los equipos ya inscritos
- * en la categoría, delega el armado del cuadro y de todas las rondas en
- * @padel-platform/tournament-engine (generateBracket + initializeBracketRounds
- * — nunca reimplementado acá), y persiste:
+ * Con datos de grupos ya confirmados, el `SeededTeam[]` inicial sale de la
+ * clasificación de cada grupo (balancedSeeding) en vez del orden de
+ * inscripción — el resto de la función es idéntico para ambos caminos.
+ */
+async function seededTeamsFromGroups(categoryId: string): Promise<SeededTeam[]> {
+  const groups = await fetchGroupsForCategory(categoryId);
+  if (groups.length === 0) {
+    throw new Error("Esta categoría todavía no tiene grupos formados.");
+  }
+
+  const standingsByGroup: Record<string, GroupStanding[]> = {};
+  for (const group of groups) {
+    const teamIds = await fetchTeamsForGroup(group.id);
+    const results = await fetchConfirmedGroupMatchResults(group.id);
+    standingsByGroup[group.id] = calculateStandings(teamIds, results);
+  }
+
+  return balancedSeeding(standingsByGroup);
+}
+
+/**
+ * Generación inicial del cuadro (docs/04_TOURNAMENT_ENGINE.md §8). El
+ * `SeededTeam[]` inicial sale de dos lugares posibles según
+ * `uses_group_stage`: orden de inscripción (bracket directo) o clasificación
+ * de grupo ya jugada (balancedSeeding) — a partir de ahí todo el resto es
+ * idéntico, delegado por completo en @padel-platform/tournament-engine
+ * (generateBracket + initializeBracketRounds, nunca reimplementado acá), y
+ * persiste:
  *   - una fila tournament_phases por ronda,
  *   - una fila matches por partido de ronda 1 (los resueltos por bye, ya CONFIRMED
  *     con winner_team_id),
@@ -30,15 +58,25 @@ export async function generateBracketForCategory(categoryId: string): Promise<{
   totalRounds: number;
   unresolvedGroupConflicts: number;
 }> {
-  const tournamentId = await fetchCategoryTournamentId(categoryId);
-  if (!tournamentId) throw new Error(`Categoría ${categoryId} no encontrada.`);
+  const category = await fetchCategoryContext(categoryId);
+  if (!category) throw new Error(`Categoría ${categoryId} no encontrada.`);
+  const { tournamentId, usesGroupStage } = category;
 
-  const enrolledTeams = await fetchEnrolledTeams(categoryId);
-  if (enrolledTeams.length < 2) {
-    throw new Error("Se necesitan al menos 2 equipos inscritos para generar el cuadro.");
+  let seededTeams: SeededTeam[];
+  if (usesGroupStage) {
+    const allConfirmed = await areAllGroupMatchesConfirmed(categoryId);
+    if (!allConfirmed) {
+      throw new Error("Todavía hay partidos de grupo sin confirmar — no se puede generar el cuadro.");
+    }
+    seededTeams = await seededTeamsFromGroups(categoryId);
+  } else {
+    const enrolledTeams = await fetchEnrolledTeams(categoryId);
+    if (enrolledTeams.length < 2) {
+      throw new Error("Se necesitan al menos 2 equipos inscritos para generar el cuadro.");
+    }
+    seededTeams = buildSeededTeams(enrolledTeams);
   }
 
-  const seededTeams = buildSeededTeams(enrolledTeams);
   const bracket = generateBracket(seededTeams);
   const rounds = initializeBracketRounds(bracket);
   const totalRounds = rounds.length;

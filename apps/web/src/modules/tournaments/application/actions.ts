@@ -3,10 +3,50 @@
 import { revalidatePath } from "next/cache";
 import { fetchAuthenticatedUser } from "@/modules/auth/infrastructure/authRepository";
 import { generateBracketForCategory } from "./generateBracketForCategory";
+import { generateGroupsForCategory } from "./generateGroupsForCategory";
 
 export interface GenerateBracketState {
   error: string | null;
   success: boolean;
+  unresolvedGroupConflicts: number;
+}
+
+export interface FormGroupsState {
+  error: string | null;
+  success: boolean;
+}
+
+const DEFAULT_GROUP_SIZE = 4;
+
+/**
+ * Formación de grupos, disparada a mano por el organizador al cerrar
+ * inscripciones de una categoría con `uses_group_stage` (docs/04 §2). Mismo
+ * criterio de autorización que generateBracketAction — RLS es la fuente de
+ * verdad, este chequeo solo da un mensaje más claro.
+ */
+export async function formGroupsAction(
+  tournamentId: string,
+  categoryId: string,
+  _prev: FormGroupsState,
+  formData: FormData
+): Promise<FormGroupsState> {
+  const { user } = await fetchAuthenticatedUser();
+  if (!user) return { error: "Tu sesión expiró. Vuelve a iniciar sesión.", success: false };
+
+  const rawGroupSize = Number(formData.get("groupSize"));
+  const groupSize = Number.isInteger(rawGroupSize) && rawGroupSize >= 2 ? rawGroupSize : DEFAULT_GROUP_SIZE;
+
+  try {
+    await generateGroupsForCategory(categoryId, groupSize);
+  } catch (e) {
+    return {
+      error: e instanceof Error ? e.message : "No se pudieron formar los grupos. Intenta de nuevo.",
+      success: false,
+    };
+  }
+
+  revalidatePath(`/dashboard/torneos/${tournamentId}`);
+  return { error: null, success: true };
 }
 
 /**
@@ -25,17 +65,20 @@ export async function generateBracketAction(
 ): Promise<GenerateBracketState> {
   /* eslint-enable @typescript-eslint/no-unused-vars */
   const { user } = await fetchAuthenticatedUser();
-  if (!user) return { error: "Tu sesión expiró. Vuelve a iniciar sesión.", success: false };
+  if (!user) return { error: "Tu sesión expiró. Vuelve a iniciar sesión.", success: false, unresolvedGroupConflicts: 0 };
 
+  let unresolvedGroupConflicts = 0;
   try {
-    await generateBracketForCategory(categoryId);
+    const result = await generateBracketForCategory(categoryId);
+    unresolvedGroupConflicts = result.unresolvedGroupConflicts;
   } catch (e) {
     return {
       error: e instanceof Error ? e.message : "No se pudo generar el cuadro. Intenta de nuevo.",
       success: false,
+      unresolvedGroupConflicts: 0,
     };
   }
 
   revalidatePath(`/dashboard/torneos/${tournamentId}`);
-  return { error: null, success: true };
+  return { error: null, success: true, unresolvedGroupConflicts };
 }

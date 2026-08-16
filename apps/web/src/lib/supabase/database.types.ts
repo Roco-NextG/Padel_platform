@@ -270,6 +270,7 @@ export interface Database {
           level: string | null;
           gender_restriction: GenderType | null;
           max_teams: number | null;
+          uses_group_stage: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -280,8 +281,25 @@ export interface Database {
           level?: string | null;
           gender_restriction?: GenderType | null;
           max_teams?: number | null;
+          uses_group_stage?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["tournament_categories"]["Insert"]>;
+      };
+      tournament_groups: {
+        Relationships: [];
+        Row: {
+          id: string;
+          category_id: string;
+          name: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_id: string;
+          name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["tournament_groups"]["Insert"]>;
       };
       tournament_phases: {
         Relationships: [];
