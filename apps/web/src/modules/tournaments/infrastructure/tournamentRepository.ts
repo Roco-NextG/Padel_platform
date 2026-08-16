@@ -161,7 +161,11 @@ export interface BracketDisplayRound {
 
 /** Reconstruye la vista completa del cuadro (todas las rondas) para mostrar de solo lectura — casillas aún no resueltas se muestran vacías ("Por definir"), nunca se inventa un Match que no existe en la base. */
 export async function fetchBracketForCategory(categoryId: string): Promise<BracketDisplayRound[]> {
-  const phases = await fetchPhasesForCategory(categoryId);
+  // La fase GROUPS (si existe) es round-robin, no una ronda de bracket — sus
+  // Match tienen round_index null para todos, así que nunca deben entrar en
+  // este cálculo de "ronda 1, ronda 2, ..." (eso rompería la numeración de
+  // casillas y produciría una columna entera de "Por definir" fantasma).
+  const phases = (await fetchPhasesForCategory(categoryId)).filter((p) => p.type !== "GROUPS");
   if (phases.length === 0) return [];
 
   const supabase = await createClient();
