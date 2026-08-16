@@ -272,22 +272,24 @@ export async function fetchTeamsForGroup(groupId: string): Promise<string[]> {
 }
 
 /**
- * Bulk upsert de un solo campo (`group_id`) — el UPSERT de Postgres solo
- * toca las columnas presentes en el payload, así que `tournament_category_id`
- * y `seed` de cada Team quedan intactos.
+ * UPDATE real por equipo — no upsert. `teams_write`'s WITH CHECK exige
+ * `tournament_category_id` para resolver is_tournament_manager(); un upsert
+ * evalúa esa política contra la fila CANDIDATA del INSERT (columnas no
+ * incluidas quedan en NULL, no en su valor ya guardado), así que rechaza
+ * cualquier upsert que no repita `tournament_category_id` en el payload. Un
+ * UPDATE real solo cambia `group_id` y evalúa la política contra la fila que
+ * ya existe, con su `tournament_category_id` real intacto.
  */
 export async function updateTeamGroups(
   assignments: { teamId: string; groupId: string }[]
 ): Promise<void> {
   if (assignments.length === 0) return;
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("teams")
-    .upsert(
-      assignments.map((a) => ({ id: a.teamId, group_id: a.groupId })),
-      { onConflict: "id" }
-    );
-  if (error) throw new Error(error.message);
+  const results = await Promise.all(
+    assignments.map((a) => supabase.from("teams").update({ group_id: a.groupId }).eq("id", a.teamId))
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(failed.error.message);
 }
 
 export interface GroupMatchInsert {
