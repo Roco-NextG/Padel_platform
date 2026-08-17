@@ -124,6 +124,8 @@ export interface Database {
           city: string | null;
           address: string | null;
           branding: ClubBranding;
+          latitude: number | null;
+          longitude: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -134,6 +136,8 @@ export interface Database {
           city?: string | null;
           address?: string | null;
           branding?: ClubBranding;
+          latitude?: number | null;
+          longitude?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["clubs"]["Insert"]>;
       };
@@ -242,6 +246,8 @@ export interface Database {
           end_date: string | null;
           scoring_config: ScoringConfigJson;
           tiebreak_rules: string[];
+          entry_fee: number | null;
+          entry_fee_currency: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -258,6 +264,8 @@ export interface Database {
           start_date?: string | null;
           end_date?: string | null;
           scoring_config?: ScoringConfigJson;
+          entry_fee?: number | null;
+          entry_fee_currency?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["tournaments"]["Insert"]>;
       };
@@ -516,6 +524,10 @@ export interface Database {
         Args: { p_role_id: string };
         Returns: void;
       };
+      nearby_published_tournaments: {
+        Args: { p_lat: number; p_lng: number; p_limit?: number };
+        Returns: NearbyTournamentResult[];
+      };
     };
   };
 }
@@ -527,6 +539,21 @@ export interface AdminUserSearchResult {
   player_id: string | null;
   first_name: string | null;
   last_name: string | null;
+}
+
+/** Una fila de nearby_published_tournaments (0017) — distance_km ya viene redondeado a 1 decimal desde la función. */
+export interface NearbyTournamentResult {
+  tournament_id: string;
+  name: string;
+  start_date: string | null;
+  cover_image_url: string | null;
+  entry_fee: number | null;
+  entry_fee_currency: string | null;
+  club_id: string;
+  club_name: string;
+  club_logo_url: string | null;
+  club_city: string | null;
+  distance_km: number;
 }
 
 /** Shape sent to submit_match_result — mirrors SetScoreInput from @padel-platform/match-engine. */
