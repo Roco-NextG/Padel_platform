@@ -5,6 +5,13 @@ import type { Database } from "./database.types";
 const AUTH_PATHS = ["/login", "/registro"];
 
 /**
+ * Rutas públicas de verdad (anon, sin sesión) — a diferencia de AUTH_PATHS,
+ * no redirigen a "/" si el visitante SÍ está logueado; simplemente no
+ * exigen sesión. Discovery (docs/08_MVP_SCOPE.md) es la primera.
+ */
+const PUBLIC_PATHS = ["/descubrir"];
+
+/**
  * Refreshes the Supabase session on every request (required by @supabase/ssr
  * so server components see a valid token) and gates the routes that require
  * a session. Role-specific gating (club/organizer vs. player) happens in the
@@ -41,8 +48,9 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthPath = AUTH_PATHS.some((path) => pathname.startsWith(path));
+  const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
 
-  if (!user && !isAuthPath) {
+  if (!user && !isAuthPath && !isPublicPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
