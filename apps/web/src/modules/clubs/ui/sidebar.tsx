@@ -12,6 +12,7 @@ import {
   ChartLineUp,
   Buildings,
   IdentificationCard,
+  ShieldCheck,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,8 @@ const primaryItems = [
   { href: "/dashboard/contenido", label: "Contenido", icon: ImageSquare },
   { href: "/dashboard/analytics", label: "Analytics", icon: ChartLineUp },
 ] as const;
+
+const adminItem = { href: "/dashboard/admin", label: "Admin", icon: ShieldCheck } as const;
 
 const settingsItems = [
   { href: "/dashboard/club", label: "Mi club", icon: Buildings },
@@ -57,7 +60,7 @@ function NavLink({
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -74,6 +77,7 @@ export function Sidebar() {
             active={item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href)}
           />
         ))}
+        {isAdmin && <NavLink {...adminItem} active={pathname.startsWith(adminItem.href)} />}
       </nav>
 
       <div className="mt-auto flex flex-col gap-0.5">

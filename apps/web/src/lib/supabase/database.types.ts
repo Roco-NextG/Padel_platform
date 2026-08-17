@@ -431,6 +431,29 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["rating_events"]["Insert"]>;
       };
+      audit_log: {
+        Relationships: [];
+        Row: {
+          id: string;
+          actor_user_id: string | null;
+          entity_type: string;
+          entity_id: string;
+          action: string;
+          before: Record<string, unknown> | null;
+          after: Record<string, unknown> | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          actor_user_id?: string | null;
+          entity_type: string;
+          entity_id: string;
+          action: string;
+          before?: Record<string, unknown> | null;
+          after?: Record<string, unknown> | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["audit_log"]["Insert"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -476,8 +499,34 @@ export interface Database {
         Args: { p_tournament_id: string; p_completed_match_id: string };
         Returns: Database["public"]["Tables"]["tournaments"]["Row"];
       };
+      admin_search_users: {
+        Args: { p_query: string };
+        Returns: AdminUserSearchResult[];
+      };
+      admin_grant_role: {
+        Args: {
+          p_user_id: string;
+          p_role: AppRole;
+          p_club_id?: string | null;
+          p_organizer_id?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["user_roles"]["Row"];
+      };
+      admin_revoke_role: {
+        Args: { p_role_id: string };
+        Returns: void;
+      };
     };
   };
+}
+
+/** Una fila de admin_search_users — auth.users.email nunca es null en la práctica, pero Supabase lo tipa nullable. */
+export interface AdminUserSearchResult {
+  user_id: string;
+  email: string | null;
+  player_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
 }
 
 /** Shape sent to submit_match_result — mirrors SetScoreInput from @padel-platform/match-engine. */

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { SignOut } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
-import { belongsOnClubSurface } from "@/modules/auth/domain/roles";
+import { belongsOnClubSurface, isAdmin } from "@/modules/auth/domain/roles";
 import { signOutAction } from "@/modules/auth/application/actions";
 import { Sidebar } from "@/modules/clubs/ui/sidebar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
@@ -13,7 +13,7 @@ export default async function ClubLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="flex">
-      <Sidebar />
+      <Sidebar isAdmin={isAdmin(context.roles)} />
       <div className="flex min-h-screen flex-1 flex-col">
         <header className="flex h-16 items-center justify-between border-b border-border px-6">
           <div />

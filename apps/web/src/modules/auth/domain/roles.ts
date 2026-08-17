@@ -46,15 +46,28 @@ export function canManageClub(roles: RoleAssignment[], clubId: string): boolean 
   );
 }
 
+const ROLE_LABELS: Record<AppRole, string> = {
+  SUPER_ADMIN: "Super Admin",
+  ADMIN: "Admin",
+  CLUB_OWNER: "Dueño de Club",
+  CLUB_MANAGER: "Gerente de Club",
+  ORGANIZER: "Organizador",
+  TOURNAMENT_STAFF: "Staff de Torneo",
+  PLAYER: "Jugador",
+};
+
 export function roleLabel(role: AppRole): string {
-  const labels: Record<AppRole, string> = {
-    SUPER_ADMIN: "Super Admin",
-    ADMIN: "Admin",
-    CLUB_OWNER: "Dueño de Club",
-    CLUB_MANAGER: "Gerente de Club",
-    ORGANIZER: "Organizador",
-    TOURNAMENT_STAFF: "Staff de Torneo",
-    PLAYER: "Jugador",
-  };
-  return labels[role];
+  return ROLE_LABELS[role];
+}
+
+export const ALL_APP_ROLES: AppRole[] = Object.keys(ROLE_LABELS) as AppRole[];
+
+/** Mirrors admin_grant_role's hard requirement (0014_admin_panel_rpc.sql). */
+export function roleRequiresClub(role: AppRole): boolean {
+  return role === "CLUB_OWNER" || role === "CLUB_MANAGER";
+}
+
+/** ORGANIZER no exige organizer_id en la RPC, pero sin él el rol no sirve para nada (is_tournament_manager lo necesita) — el panel lo pide igual. */
+export function roleAcceptsOrganizer(role: AppRole): boolean {
+  return role === "ORGANIZER";
 }
