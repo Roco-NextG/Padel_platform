@@ -13,7 +13,7 @@ import {
  * only has TOURNAMENT_MATCH/COMPETITIVE_MATCH. Casual play is unrated by
  * design (docs/06_MATCH_ENGINE.md §1: CASUAL is a v2 concept, not exposed yet).
  */
-function toRatingMatchType(matchType: DbMatchType): MatchTypeForRating | null {
+export function toRatingMatchType(matchType: DbMatchType): MatchTypeForRating | null {
   if (matchType === "TOURNAMENT") return "TOURNAMENT";
   if (matchType === "COMPETITIVE") return "COMPETITIVE";
   return null;

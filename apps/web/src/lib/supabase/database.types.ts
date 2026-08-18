@@ -528,6 +528,15 @@ export interface Database {
         Args: { p_lat: number; p_lng: number; p_limit?: number };
         Returns: NearbyTournamentResult[];
       };
+      apply_match_correction: {
+        Args: {
+          p_match_id: string;
+          p_sets: SetScoreRpcInput[];
+          p_winner_team_id: string;
+          p_rating_events: RatingEventRpcInput[];
+        };
+        Returns: Database["public"]["Tables"]["matches"]["Row"];
+      };
     };
   };
 }

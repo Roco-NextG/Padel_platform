@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { Database, SetScoreRpcInput } from "@/lib/supabase/database.types";
+import type { Database, RatingEventRpcInput, SetScoreRpcInput } from "@/lib/supabase/database.types";
 import { parseScoringConfig } from "../domain/match";
 import type {
   MatchConfirmationState,
@@ -127,6 +127,32 @@ export async function submitMatchResultRpc(input: {
     p_sets: input.sets,
     p_winner: input.winner,
     p_by_organizer: input.byOrganizer,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/**
+ * Corrección de un partido ya CONFIRMED (docs/05_RATING_ENGINE.md §8) —
+ * `apply_match_correction` (security definer, 0018_match_result_correction.sql)
+ * re-valida is_admin() y el estado CONFIRMED server-side, reemplaza los sets,
+ * actualiza el ganador, marca los rating_events viejos como superseded e
+ * inserta los nuevos. No valida scoring ni calcula rating: eso ya pasó en la
+ * capa de aplicación (validateMatchResult + applyMatchResult), igual que en
+ * submitMatchResultRpc/insertRatingEvents.
+ */
+export async function applyMatchCorrectionRpc(input: {
+  matchId: string;
+  sets: SetScoreRpcInput[];
+  winnerTeamId: string;
+  ratingEvents: RatingEventRpcInput[];
+}): Promise<MatchRow> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("apply_match_correction", {
+    p_match_id: input.matchId,
+    p_sets: input.sets,
+    p_winner_team_id: input.winnerTeamId,
+    p_rating_events: input.ratingEvents,
   });
   if (error) throw new Error(error.message);
   return data;

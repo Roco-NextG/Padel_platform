@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMatchDetail } from "@/modules/matches/application/getMatches";
 import { MatchStatusBadge } from "@/modules/matches/ui/match-status-badge";
 import { MatchScoreline } from "@/modules/matches/ui/match-scoreline";
 import { ScoreEntryForm } from "@/modules/matches/ui/score-entry-form";
 import { Badge } from "@/components/ui/badge";
+import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
+import { isAdmin } from "@/modules/auth/domain/roles";
 
 export const metadata: Metadata = { title: "Partido — Padel Platform" };
 
@@ -14,16 +17,23 @@ function teamLabel(team: { players: { firstName: string }[] }): string {
 
 export default async function MatchDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ matchId: string }>;
+  searchParams: Promise<{ correct?: string }>;
 }) {
   const { matchId } = await params;
+  const { correct } = await searchParams;
   const detail = await getMatchDetail(matchId);
   if (!detail) notFound();
 
   const { match, confirmations } = detail;
   const canSubmit = match.status === "SCHEDULED" || match.status === "IN_PROGRESS";
   const canResolve = match.status === "DISPUTED";
+
+  const context = await getCurrentUserContext();
+  const canCorrect = match.status === "CONFIRMED" && isAdmin(context?.roles ?? []);
+  const showCorrectionForm = canCorrect && correct === "1";
 
   return (
     <div className="flex max-w-xl flex-col gap-8">
@@ -72,6 +82,32 @@ export default async function MatchDetailPage({
             {canResolve ? "Resolver disputa (reemplaza el resultado registrado)" : "Registrar resultado"}
           </h2>
           <ScoreEntryForm match={match} asOrganizer />
+        </div>
+      )}
+
+      {canCorrect && !showCorrectionForm && (
+        <div>
+          <Link
+            href={`/dashboard/partidos/${matchId}?correct=1`}
+            className="text-sm font-medium text-accent hover:underline"
+          >
+            Corregir resultado
+          </Link>
+        </div>
+      )}
+
+      {showCorrectionForm && (
+        <div>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-medium text-muted-foreground">Corregir resultado</h2>
+            <Link
+              href={`/dashboard/partidos/${matchId}`}
+              className="text-xs text-muted-foreground hover:underline"
+            >
+              Cancelar
+            </Link>
+          </div>
+          <ScoreEntryForm match={match} asOrganizer mode="correct" />
         </div>
       )}
     </div>
