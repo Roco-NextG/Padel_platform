@@ -25,6 +25,58 @@ export async function fetchTournamentById(id: string): Promise<TournamentRow | n
   return data;
 }
 
+export interface TournamentCardCounts {
+  categoryCount: number;
+  teamCount: number;
+}
+
+/**
+ * Conteo de categorías/parejas por torneo para el grid de "Mis Torneos"
+ * (11_UX_HANDOFF.md §3.6) — no lo devuelve fetchTournamentsForOrganizerView
+ * (esa sigue siendo un `select("*")` liso sobre `tournaments`), así que se
+ * arma aparte con el mismo patrón de dos consultas + merge en JS que ya usa
+ * fetchCategoriesWithSummary, sin tocarla.
+ */
+export async function fetchTournamentCardCounts(
+  tournamentIds: string[]
+): Promise<Map<string, TournamentCardCounts>> {
+  const counts = new Map<string, TournamentCardCounts>();
+  if (tournamentIds.length === 0) return counts;
+
+  const supabase = await createClient();
+  const { data: categories, error: categoriesError } = await supabase
+    .from("tournament_categories")
+    .select("id, tournament_id")
+    .in("tournament_id", tournamentIds);
+  if (categoriesError) throw new Error(categoriesError.message);
+
+  for (const id of tournamentIds) counts.set(id, { categoryCount: 0, teamCount: 0 });
+  const tournamentIdByCategory = new Map<string, string>();
+  for (const c of categories ?? []) {
+    tournamentIdByCategory.set(c.id, c.tournament_id);
+    const entry = counts.get(c.tournament_id)!;
+    entry.categoryCount += 1;
+  }
+
+  const categoryIds = (categories ?? []).map((c) => c.id);
+  if (categoryIds.length > 0) {
+    const { data: teams, error: teamsError } = await supabase
+      .from("teams")
+      .select("tournament_category_id")
+      .in("tournament_category_id", categoryIds);
+    if (teamsError) throw new Error(teamsError.message);
+
+    for (const t of teams ?? []) {
+      if (!t.tournament_category_id) continue;
+      const tournamentId = tournamentIdByCategory.get(t.tournament_category_id);
+      if (!tournamentId) continue;
+      counts.get(tournamentId)!.teamCount += 1;
+    }
+  }
+
+  return counts;
+}
+
 export interface CategorySummary {
   id: string;
   name: string;

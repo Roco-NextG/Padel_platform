@@ -1,13 +1,14 @@
 import { cn } from "@/lib/utils";
 
-type Tone = "neutral" | "accent" | "success" | "warning" | "destructive";
+type Tone = "neutral" | "accent" | "success" | "warning" | "destructive" | "pause";
 
 const toneClasses: Record<Tone, string> = {
   neutral: "bg-surface-secondary text-muted-foreground",
-  accent: "bg-accent-muted text-accent",
+  accent: "bg-accent-muted text-accent-text",
   success: "bg-success-muted text-success",
   warning: "bg-warning-muted text-warning",
   destructive: "bg-destructive-muted text-destructive",
+  pause: "bg-pause-muted text-pause",
 };
 
 export function Badge({
