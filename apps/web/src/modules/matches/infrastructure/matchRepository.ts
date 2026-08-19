@@ -23,13 +23,18 @@ async function fetchTeam(teamId: string): Promise<MatchTeam> {
 
   const { data: players, error: playersError } = await supabase
     .from("players")
-    .select("id, first_name, last_name")
+    .select("id, first_name, last_name, photo_url")
     .in("id", playerIds);
   if (playersError) throw new Error(playersError.message);
 
   const participants: MatchParticipant[] = playerIds.map((id) => {
     const p = players?.find((row) => row.id === id);
-    return { playerId: id, firstName: p?.first_name ?? "?", lastName: p?.last_name ?? "" };
+    return {
+      playerId: id,
+      firstName: p?.first_name ?? "?",
+      lastName: p?.last_name ?? "",
+      photoUrl: p?.photo_url ?? null,
+    };
   });
 
   return { teamId, players: participants };
@@ -46,15 +51,17 @@ export async function fetchMatchWithContext(matchId: string): Promise<MatchWithC
   if (!match || !match.team_a_id || !match.team_b_id) return null;
 
   let tournamentName: string | null = null;
+  let clubId: string | null = null;
   let scoringConfig = parseScoringConfig(null);
   if (match.tournament_id) {
     const { data: tournament } = await supabase
       .from("tournaments")
-      .select("name, scoring_config")
+      .select("name, club_id, scoring_config")
       .eq("id", match.tournament_id)
       .maybeSingle();
     if (tournament) {
       tournamentName = tournament.name;
+      clubId = tournament.club_id;
       scoringConfig = parseScoringConfig(tournament.scoring_config);
     }
   }
@@ -71,12 +78,15 @@ export async function fetchMatchWithContext(matchId: string): Promise<MatchWithC
     matchType: match.match_type,
     tournamentId: match.tournament_id,
     tournamentName,
+    clubId,
+    courtId: match.court_id,
     scheduledStart: match.scheduled_start,
     scoringConfig,
     teamA,
     teamB,
     winnerTeamId: match.winner_team_id,
     sets,
+    isPaused: match.is_paused,
   };
 }
 
@@ -172,6 +182,44 @@ export async function upsertMatchConfirmation(
       { onConflict: "match_id,player_id" }
     );
   if (error) throw new Error(error.message);
+}
+
+/** Pausar/reanudar (0023_match_pause.sql) — UPDATE directo, cubierto por matches_write (is_tournament_manager). El CHECK matches_is_paused_only_in_progress es la última palabra sobre cuándo es válido. */
+export async function setMatchPaused(matchId: string, paused: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("matches").update({ is_paused: paused }).eq("id", matchId);
+  if (error) throw new Error(error.message);
+}
+
+/** Cancelar (status -> CANCELLED) — UPDATE directo, misma RLS que setMatchPaused. La transición válida la decide canTransition() del Match Engine, sin tocarlo, antes de llegar acá. */
+export async function cancelMatch(matchId: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("matches").update({ status: "CANCELLED" }).eq("id", matchId);
+  if (error) throw new Error(error.message);
+}
+
+/** "Cambiar pista" — UPDATE directo de court_id, misma RLS. */
+export async function updateMatchCourt(matchId: string, courtId: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("matches").update({ court_id: courtId }).eq("id", matchId);
+  if (error) throw new Error(error.message);
+}
+
+export interface CourtOption {
+  id: string;
+  name: string;
+}
+
+/** courts_select es pública (using (true)) — no depende de is_tournament_manager, solo se filtra por club_id acá. */
+export async function fetchClubCourts(clubId: string): Promise<CourtOption[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("courts")
+    .select("id, name")
+    .eq("club_id", clubId)
+    .order("name");
+  if (error) throw new Error(error.message);
+  return data ?? [];
 }
 
 export async function fetchMatchStatus(matchId: string): Promise<string | null> {

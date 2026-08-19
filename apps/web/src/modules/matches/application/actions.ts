@@ -3,14 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { applyMatchResult } from "@padel-platform/rating-engine";
 import type { RatingMatchInput } from "@padel-platform/rating-engine";
-import { validateMatchResult } from "@padel-platform/match-engine";
-import type { SetScoreInput } from "@padel-platform/match-engine";
+import { canTransition, validateMatchResult } from "@padel-platform/match-engine";
+import type { MatchStatus, SetScoreInput } from "@padel-platform/match-engine";
 import { matchResultSubmissionSchema } from "../domain/match";
 import {
   applyMatchCorrectionRpc,
+  cancelMatch,
   fetchMatchStatus,
   fetchMatchWithContext,
+  setMatchPaused,
   submitMatchResultRpc,
+  updateMatchCourt,
   upsertMatchConfirmation,
 } from "../infrastructure/matchRepository";
 import type { DbMatchType } from "@/lib/supabase/database.types";
@@ -296,4 +299,88 @@ export async function correctMatchResultAction(
   if (match.tournamentId) revalidatePath(`/dashboard/torneos/${match.tournamentId}`);
   revalidatePath("/");
   return { error: null, success: true };
+}
+
+export interface SimpleActionState {
+  error: string | null;
+}
+
+/**
+ * Pausar/Reanudar/Cancelar/Cambiar pista (menú ••• del card, redesign/partidos-vivo
+ * §4) — sin useActionState/<form>: no llevan campos, se invocan directo desde
+ * el onClick del menú. La autorización real la sigue imponiendo matches_write
+ * RLS (is_tournament_manager); este chequeo de sesión solo da un mensaje más
+ * claro que el error crudo de Postgres para quien no está logueado.
+ */
+export async function pauseMatchAction(matchId: string): Promise<SimpleActionState> {
+  const { user } = await fetchAuthenticatedUser();
+  if (!user) return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+
+  const match = await fetchMatchWithContext(matchId);
+  if (!match) return { error: "No se encontró el partido." };
+  if (match.status !== "IN_PROGRESS") {
+    return { error: "Solo se puede pausar un partido en curso." };
+  }
+
+  try {
+    await setMatchPaused(matchId, true);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo pausar el partido." };
+  }
+
+  revalidatePath("/dashboard/partidos");
+  revalidatePath(`/dashboard/partidos/${matchId}`);
+  return { error: null };
+}
+
+export async function resumeMatchAction(matchId: string): Promise<SimpleActionState> {
+  const { user } = await fetchAuthenticatedUser();
+  if (!user) return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+
+  try {
+    await setMatchPaused(matchId, false);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo reanudar el partido." };
+  }
+
+  revalidatePath("/dashboard/partidos");
+  revalidatePath(`/dashboard/partidos/${matchId}`);
+  return { error: null };
+}
+
+/** canTransition (Match Engine, sin modificar) decide si el estado actual admite pasar a CANCELLED — misma máquina de estados que ya usa el resto de la app, no una regla nueva. */
+export async function cancelMatchAction(matchId: string): Promise<SimpleActionState> {
+  const { user } = await fetchAuthenticatedUser();
+  if (!user) return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+
+  const status = await fetchMatchStatus(matchId);
+  if (!status) return { error: "No se encontró el partido." };
+  if (!canTransition(status as MatchStatus, "CANCELLED")) {
+    return { error: `No se puede cancelar un partido en estado ${status}.` };
+  }
+
+  try {
+    await cancelMatch(matchId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo cancelar el partido." };
+  }
+
+  revalidatePath("/dashboard/partidos");
+  revalidatePath(`/dashboard/partidos/${matchId}`);
+  return { error: null };
+}
+
+export async function changeMatchCourtAction(matchId: string, courtId: string): Promise<SimpleActionState> {
+  const { user } = await fetchAuthenticatedUser();
+  if (!user) return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+
+  try {
+    await updateMatchCourt(matchId, courtId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo cambiar la pista." };
+  }
+
+  revalidatePath("/dashboard/partidos");
+  revalidatePath(`/dashboard/partidos/${matchId}`);
+  return { error: null };
 }

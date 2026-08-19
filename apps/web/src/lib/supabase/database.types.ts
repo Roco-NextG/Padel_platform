@@ -38,6 +38,7 @@ export type MatchStatus =
   | "DISPUTED"
   | "CANCELLED";
 export type DbMatchType = "TOURNAMENT" | "COMPETITIVE" | "CASUAL";
+export type CourtStatus = "AVAILABLE" | "MAINTENANCE" | "DISABLED";
 export type RatingReason = "TOURNAMENT_MATCH" | "COMPETITIVE_MATCH";
 export type TournamentStatus =
   | "DRAFT"
@@ -149,6 +150,28 @@ export interface Database {
           longitude?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["clubs"]["Insert"]>;
+      };
+      courts: {
+        Relationships: [];
+        Row: {
+          id: string;
+          club_id: string;
+          name: string;
+          number: number | null;
+          indoor: boolean;
+          status: CourtStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          club_id: string;
+          name: string;
+          number?: number | null;
+          indoor?: boolean;
+          status?: CourtStatus;
+        };
+        Update: Partial<Database["public"]["Tables"]["courts"]["Insert"]>;
       };
       organizers: {
         Relationships: [];
@@ -371,6 +394,7 @@ export interface Database {
           status: MatchStatus;
           winner_team_id: string | null;
           match_type: DbMatchType;
+          is_paused: boolean;
           created_at: string;
           updated_at: string;
           created_by: string | null;
@@ -389,6 +413,7 @@ export interface Database {
           status?: MatchStatus;
           winner_team_id?: string | null;
           match_type?: DbMatchType;
+          is_paused?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["matches"]["Insert"]>;
       };

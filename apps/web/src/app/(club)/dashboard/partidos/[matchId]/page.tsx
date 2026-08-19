@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getMatchDetail } from "@/modules/matches/application/getMatches";
+import { getClubCourts, getMatchDetail } from "@/modules/matches/application/getMatches";
 import { MatchStatusBadge } from "@/modules/matches/ui/match-status-badge";
 import { MatchScoreline } from "@/modules/matches/ui/match-scoreline";
 import { ScoreEntryForm } from "@/modules/matches/ui/score-entry-form";
+import { MatchActionsMenu } from "@/modules/matches/ui/match-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
 import { isAdmin } from "@/modules/auth/domain/roles";
@@ -28,6 +29,7 @@ export default async function MatchDetailPage({
   if (!detail) notFound();
 
   const { match, confirmations } = detail;
+  const courts = match.clubId ? await getClubCourts(match.clubId) : [];
   const canSubmit = match.status === "SCHEDULED" || match.status === "IN_PROGRESS";
   const canResolve = match.status === "DISPUTED";
 
@@ -47,7 +49,16 @@ export default async function MatchDetailPage({
             <p className="text-sm text-muted-foreground">{match.tournamentName}</p>
           )}
         </div>
-        <MatchStatusBadge status={match.status} />
+        <div className="flex items-center gap-2">
+          <MatchStatusBadge status={match.status} isPaused={match.isPaused} />
+          <MatchActionsMenu
+            matchId={match.id}
+            status={match.status}
+            isPaused={match.isPaused}
+            courtId={match.courtId}
+            courts={courts}
+          />
+        </div>
       </div>
 
       {match.sets.length > 0 && (
