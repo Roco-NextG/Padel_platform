@@ -1,0 +1,29 @@
+-- ============================================================================
+-- Padel Platform — Migración 0020: gender_type + 'MIXED'
+--
+-- tournament_categories.gender_restriction (0001_schema.sql) reusa el mismo
+-- enum gender_type que Player.gender ('MALE','FEMALE','OTHER') — correcto
+-- mientras la restricción de una categoría era "solo hombres"/"solo
+-- mujeres", pero el paso 3 de Crear Torneo (11_UX_HANDOFF.md §3.6) necesita
+-- una tercera rama: "Mixto" (una pareja con un jugador de cada género —
+-- distinto de OTHER, que describe el género de UN jugador, no de una
+-- pareja). No hay ningún valor hoy que represente eso.
+--
+-- Se agrega 'MIXED' al enum EXISTENTE en vez de crear un tipo nuevo
+-- (category_gender_type) y migrar la columna: ALTER TYPE ... ADD VALUE no es
+-- destructivo, no toca ninguna fila existente, y evita el riesgo de una
+-- migración de tipo de columna sobre una tabla con datos reales en
+-- producción (Torneo de Prueba, Torneo Valencia Open, etc. — ver 0016/0017).
+-- El costo es que Player.gender queda TIPADO para admitir 'MIXED' aunque
+-- nunca tenga sentido ahí — se acepta porque las validaciones reales viven
+-- en zod (playerProfileSchema ya restringe a MALE/FEMALE/OTHER) y en los
+-- formularios, no en el enum en sí. Ver 11_UX_HANDOFF.md §3.6: "Masculina si
+-- ambos son hombres, Femenina si ambas mujeres, Mixta si uno de cada uno" —
+-- cualquier otra combinación (incluido OTHER) certifica como Mixta.
+--
+-- ADD VALUE no puede usarse dentro de la misma transacción en la que el
+-- valor nuevo se lee/escribe — esta migración solo agrega el valor, ningún
+-- INSERT/UPDATE de esta misma migración lo usa.
+-- ============================================================================
+
+alter type public.gender_type add value if not exists 'MIXED';

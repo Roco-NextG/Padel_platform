@@ -19,5 +19,6 @@ export async function getPlayerProfileForUser(userId: string): Promise<Player | 
     publicProfile: row.public_profile,
     currentRating: row.current_rating,
     currentRatingDeviation: row.current_rating_deviation,
+    category: row.category,
   };
 }

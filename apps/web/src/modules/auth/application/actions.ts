@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { isAuthApiError } from "@supabase/supabase-js";
+import type { GenderType } from "@/lib/supabase/database.types";
 import { signInSchema, signUpSchema } from "../domain/schemas";
 import { signInWithPassword, signOutUser, signUpWithPassword } from "../infrastructure/authRepository";
 import { belongsOnClubSurface } from "../domain/roles";
@@ -10,7 +11,13 @@ import { getCurrentUserContext } from "./getCurrentUserContext";
 
 export interface AuthActionState {
   error: string | null;
-  values?: { firstName?: string; lastName?: string; email?: string };
+  values?: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    gender?: string;
+    category?: string;
+  };
 }
 
 export async function signUpAction(
@@ -22,6 +29,8 @@ export async function signUpAction(
     lastName: String(formData.get("lastName") ?? ""),
     email: String(formData.get("email") ?? ""),
     password: formData.get("password"),
+    gender: String(formData.get("gender") ?? ""),
+    category: String(formData.get("category") ?? ""),
   };
   const parsed = signUpSchema.safeParse(raw);
   if (!parsed.success) {
@@ -47,6 +56,8 @@ export async function signUpAction(
   await ensurePlayerProfile(data.user.id, {
     firstName: parsed.data.firstName,
     lastName: parsed.data.lastName,
+    gender: parsed.data.gender,
+    category: parsed.data.category,
   });
 
   redirect("/");
@@ -70,10 +81,17 @@ export async function signInAction(
     return { error: "No se pudo iniciar sesión. Intenta de nuevo.", values: { email } };
   }
 
-  const meta = data.user.user_metadata as { first_name?: string; last_name?: string };
+  const meta = data.user.user_metadata as {
+    first_name?: string;
+    last_name?: string;
+    gender?: GenderType;
+    category?: number;
+  };
   await ensurePlayerProfile(data.user.id, {
     firstName: meta?.first_name,
     lastName: meta?.last_name,
+    gender: meta?.gender,
+    category: meta?.category,
   });
 
   const context = await getCurrentUserContext();

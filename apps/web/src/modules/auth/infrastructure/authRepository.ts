@@ -7,7 +7,16 @@ export async function signUpWithPassword(input: SignUpInput) {
     email: input.email,
     password: input.password,
     options: {
-      data: { first_name: input.firstName, last_name: input.lastName },
+      // gender/category survive here across the email-confirmation gap —
+      // ensurePlayerProfile can't write the players row until there's a
+      // session (see its own comment), and signInAction's repair path reads
+      // them back from here, same as first_name/last_name already did.
+      data: {
+        first_name: input.firstName,
+        last_name: input.lastName,
+        gender: input.gender,
+        category: input.category,
+      },
     },
   });
 }

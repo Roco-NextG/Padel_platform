@@ -7,10 +7,13 @@ export function ChoiceGroup({
   name,
   options,
   defaultValue,
+  onChange,
 }: {
   name: string;
   options: { value: string; label: string }[];
   defaultValue?: string;
+  /** Optional — only needed outside a <form> where nothing reads FormData on submit (e.g. wizard steps that call a server action directly). */
+  onChange?: (value: string) => void;
 }) {
   const groupId = useId();
   const [selected, setSelected] = useState(defaultValue);
@@ -37,7 +40,10 @@ export function ChoiceGroup({
               name={name}
               value={option.value}
               checked={isSelected}
-              onChange={() => setSelected(option.value)}
+              onChange={() => {
+                setSelected(option.value);
+                onChange?.(option.value);
+              }}
               className="sr-only"
             />
             {option.label}

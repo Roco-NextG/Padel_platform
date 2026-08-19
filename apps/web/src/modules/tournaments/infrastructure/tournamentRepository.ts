@@ -600,3 +600,274 @@ export async function finishTournamentRpc(input: {
   if (error) throw new Error(error.message);
   return data;
 }
+
+/* =============================================================
+   Crear Torneo — wizard (docs/11_UX_HANDOFF.md §3.6)
+============================================================= */
+
+/**
+ * Paso 1 — INSERT en status=DRAFT al crear, no al terminar el wizard
+ * (docs/11_UX_HANDOFF.md §3.6, paso 1). `.select().single()` funciona
+ * directo desde el cliente porque tournaments_select ya no pasa por
+ * is_tournament_manager(id) para esta tabla específicamente — ver la nota
+ * grande en 0009_repair_tournament_rls.sql sobre el bug de INSERT...
+ * RETURNING con una función security definer autorreferencial.
+ */
+export async function insertTournamentDraft(input: {
+  name: string;
+  organizerId: string;
+  clubId: string;
+  startDate: string | null;
+  endDate: string | null;
+  description: string | null;
+  logoUrl: string | null;
+  coverImageUrl: string | null;
+}): Promise<TournamentRow> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournaments")
+    .insert({
+      name: input.name,
+      organizer_id: input.organizerId,
+      club_id: input.clubId,
+      status: "DRAFT",
+      start_date: input.startDate,
+      end_date: input.endDate,
+      description: input.description,
+      logo_url: input.logoUrl,
+      cover_image_url: input.coverImageUrl,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function updateTournamentDetails(
+  id: string,
+  patch: {
+    name?: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    description?: string | null;
+  }
+): Promise<TournamentRow> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournaments")
+    .update({
+      ...(patch.name !== undefined && { name: patch.name }),
+      ...(patch.startDate !== undefined && { start_date: patch.startDate }),
+      ...(patch.endDate !== undefined && { end_date: patch.endDate }),
+      ...(patch.description !== undefined && { description: patch.description }),
+    })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function publishTournament(id: string): Promise<TournamentRow> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournaments")
+    .update({ is_published: true })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/* ---------- Paso 3 — Categorías ---------- */
+
+export interface WizardCategory {
+  id: string;
+  level: number;
+  genderRestriction: GenderType;
+}
+
+/** level se guarda como texto ("1".."7", ver database.types.ts) — se parsea a número acá, nunca se compara como string. */
+export async function fetchWizardCategories(tournamentId: string): Promise<WizardCategory[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournament_categories")
+    .select("id, level, gender_restriction")
+    .eq("tournament_id", tournamentId);
+  if (error) throw new Error(error.message);
+  return (data ?? [])
+    .filter((c) => c.level !== null && c.gender_restriction !== null)
+    .map((c) => ({ id: c.id, level: Number(c.level), genderRestriction: c.gender_restriction! }));
+}
+
+/** name = "{level}.ª {rama}" solo para lectura humana en otras pantallas (ej. bracket) — level/gender_restriction son los campos que la elegibilidad realmente usa. */
+export async function insertTournamentCategory(
+  tournamentId: string,
+  level: number,
+  genderRestriction: GenderType
+): Promise<WizardCategory> {
+  const supabase = await createClient();
+  const genderLabel =
+    genderRestriction === "MALE" ? "Masculina" : genderRestriction === "FEMALE" ? "Femenina" : "Mixta";
+  const { data, error } = await supabase
+    .from("tournament_categories")
+    .insert({
+      tournament_id: tournamentId,
+      name: `${level}.ª ${genderLabel}`,
+      level: String(level),
+      gender_restriction: genderRestriction,
+    })
+    .select("id, level, gender_restriction")
+    .single();
+  if (error) throw new Error(error.message);
+  return { id: data.id, level: Number(data.level), genderRestriction: data.gender_restriction! };
+}
+
+export async function deleteTournamentCategory(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("tournament_categories").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/* ---------- Paso 2 — Patrocinadores ---------- */
+
+export interface SponsorRow {
+  id: string;
+  name: string;
+  logoUrl: string;
+}
+
+export async function fetchSponsors(tournamentId: string): Promise<SponsorRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("sponsors")
+    .select("id, name, logo_url")
+    .eq("tournament_id", tournamentId)
+    .order("created_at");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((s) => ({ id: s.id, name: s.name, logoUrl: s.logo_url }));
+}
+
+export async function insertSponsor(
+  tournamentId: string,
+  name: string,
+  logoUrl: string
+): Promise<SponsorRow> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("sponsors")
+    .insert({ tournament_id: tournamentId, name, logo_url: logoUrl })
+    .select("id, name, logo_url")
+    .single();
+  if (error) throw new Error(error.message);
+  return { id: data.id, name: data.name, logoUrl: data.logo_url };
+}
+
+export async function deleteSponsor(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("sponsors").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/** Sube a Storage (bucket público sponsor-logos, 0022_sponsors.sql) y devuelve la URL pública — el nombre del archivo incluye el tournamentId para no pisar logos de otro torneo. */
+export async function uploadSponsorLogo(tournamentId: string, file: File): Promise<string> {
+  const supabase = await createClient();
+  const ext = file.name.split(".").pop() || "png";
+  const path = `${tournamentId}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from("sponsor-logos").upload(path, file);
+  if (error) throw new Error(error.message);
+  const { data } = supabase.storage.from("sponsor-logos").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+/* ---------- Paso 4 — Inscripciones ---------- */
+
+/** INSERT team + 2x team_members — RLS (teams_write/team_members_write, 0009) ya exige is_tournament_manager vía la categoría; la elegibilidad en sí NO tiene constraint (docs/11_UX_HANDOFF.md §4 #9), la valida la capa de aplicación antes de llamar acá. */
+export async function insertTeamWithMembers(
+  categoryId: string,
+  playerAId: string,
+  playerBId: string
+): Promise<string> {
+  const supabase = await createClient();
+  const { data: team, error: teamError } = await supabase
+    .from("teams")
+    .insert({ tournament_category_id: categoryId })
+    .select("id")
+    .single();
+  if (teamError) throw new Error(teamError.message);
+
+  const { error: membersError } = await supabase
+    .from("team_members")
+    .insert([
+      { team_id: team.id, player_id: playerAId },
+      { team_id: team.id, player_id: playerBId },
+    ]);
+  if (membersError) throw new Error(membersError.message);
+
+  return team.id;
+}
+
+export async function deleteTeam(teamId: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("teams").delete().eq("id", teamId);
+  if (error) throw new Error(error.message);
+}
+
+export interface EnrolledTeam {
+  teamId: string;
+  categoryId: string;
+  categoryLevel: number;
+  categoryGenderRestriction: GenderType;
+  playerAName: string;
+  playerBName: string;
+}
+
+/** Roster completo del torneo (todas las categorías, la UI filtra en el cliente) — mismo patrón de dos consultas + merge que fetchTeamNames. */
+export async function fetchWizardRoster(tournamentId: string): Promise<EnrolledTeam[]> {
+  const categories = await fetchWizardCategories(tournamentId);
+  if (categories.length === 0) return [];
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
+
+  const supabase = await createClient();
+  const { data: teams, error: teamsError } = await supabase
+    .from("teams")
+    .select("id, tournament_category_id")
+    .in("tournament_category_id", categories.map((c) => c.id));
+  if (teamsError) throw new Error(teamsError.message);
+  if (!teams || teams.length === 0) return [];
+
+  const { data: members, error: membersError } = await supabase
+    .from("team_members")
+    .select("team_id, player_id")
+    .in(
+      "team_id",
+      teams.map((t) => t.id)
+    );
+  if (membersError) throw new Error(membersError.message);
+
+  const playerIds = Array.from(new Set((members ?? []).map((m) => m.player_id)));
+  const { data: players, error: playersError } = await supabase
+    .from("players")
+    .select("id, first_name, last_name")
+    .in("id", playerIds.length > 0 ? playerIds : [""]);
+  if (playersError) throw new Error(playersError.message);
+  const nameById = new Map((players ?? []).map((p) => [p.id, `${p.first_name} ${p.last_name}`.trim()]));
+
+  return teams
+    .filter((t) => t.tournament_category_id && categoryById.has(t.tournament_category_id))
+    .map((t) => {
+      const category = categoryById.get(t.tournament_category_id!)!;
+      const [playerAId, playerBId] = (members ?? [])
+        .filter((m) => m.team_id === t.id)
+        .map((m) => m.player_id);
+      return {
+        teamId: t.id,
+        categoryId: category.id,
+        categoryLevel: category.level,
+        categoryGenderRestriction: category.genderRestriction,
+        playerAName: nameById.get(playerAId) ?? "?",
+        playerBName: nameById.get(playerBId) ?? "?",
+      };
+    });
+}

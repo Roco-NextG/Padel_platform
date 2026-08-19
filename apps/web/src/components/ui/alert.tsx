@@ -6,7 +6,7 @@ type Tone = "error" | "success" | "info";
 const config = {
   error: { icon: WarningCircle, classes: "bg-destructive-muted text-destructive" },
   success: { icon: CheckCircle, classes: "bg-success-muted text-success" },
-  info: { icon: Info, classes: "bg-accent-muted text-accent" },
+  info: { icon: Info, classes: "bg-accent-muted text-accent-text" },
 } as const;
 
 export function Alert({ tone, children }: { tone: Tone; children: React.ReactNode }) {

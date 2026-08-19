@@ -22,9 +22,15 @@ function formatDateRange(startDate: string | null, endDate: string | null): stri
 
 export function TournamentCard({ tournament }: { tournament: TournamentCardData }) {
   const hasName = tournament.name.trim().length > 0;
+  // Publicado → bracket real. Borrador/Configurado → vuelve al asistente donde se quedó
+  // (11_UX_HANDOFF.md §3.6: "el mismo botón se comporta distinto según el estado").
+  const href =
+    tournament.cardStatus === "publicado"
+      ? `/dashboard/torneos/${tournament.id}`
+      : `/dashboard/torneos/${tournament.id}/editar`;
 
   return (
-    <Link href={`/dashboard/torneos/${tournament.id}`} className="block">
+    <Link href={href} className="block">
       <Card interactive>
         <div className="relative mb-3 h-19 rounded-md bg-[radial-gradient(circle_at_20%_20%,var(--color-accent-muted),transparent_60%)] bg-inverse">
           <Badge tone={STATUS_TONE[tournament.cardStatus]} className="absolute top-2 right-2">

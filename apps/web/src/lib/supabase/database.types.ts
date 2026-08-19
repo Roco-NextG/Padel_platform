@@ -11,7 +11,13 @@
  *   supabase gen types typescript --project-id <id> > src/lib/supabase/database.types.ts
  */
 
-export type GenderType = "MALE" | "FEMALE" | "OTHER";
+/**
+ * MIXED added in 0020_gender_type_mixed.sql — only meaningful on
+ * tournament_categories.gender_restriction (a pair with one player of each
+ * gender), never on Player.gender itself (playerProfileSchema and every
+ * player-facing form still only offer MALE/FEMALE/OTHER).
+ */
+export type GenderType = "MALE" | "FEMALE" | "OTHER" | "MIXED";
 export type HandType = "RIGHT" | "LEFT";
 export type PositionType = "DRIVE" | "REVES" | "BOTH";
 export type ClubRole = "MEMBER" | "STAFF" | "OWNER" | "MANAGER";
@@ -95,6 +101,8 @@ export interface Database {
           primary_club_id: string | null;
           current_rating: number | null;
           current_rating_deviation: number | null;
+          /** 0019_player_category.sql — declarada al alta, nunca derivada de current_rating. */
+          category: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -112,6 +120,7 @@ export interface Database {
           preferred_position?: PositionType | null;
           public_profile?: boolean;
           primary_club_id?: string | null;
+          category?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["players"]["Insert"]>;
       };
@@ -292,6 +301,23 @@ export interface Database {
           uses_group_stage?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["tournament_categories"]["Insert"]>;
+      };
+      sponsors: {
+        Relationships: [];
+        Row: {
+          id: string;
+          tournament_id: string;
+          name: string;
+          logo_url: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tournament_id: string;
+          name: string;
+          logo_url: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["sponsors"]["Insert"]>;
       };
       tournament_groups: {
         Relationships: [];
@@ -537,8 +563,39 @@ export interface Database {
         };
         Returns: Database["public"]["Tables"]["matches"]["Row"];
       };
+      search_players_for_enrollment: {
+        Args: { p_query: string };
+        Returns: EnrollmentPlayerResult[];
+      };
+      create_player_for_enrollment: {
+        Args: {
+          p_first_name: string;
+          p_last_name: string;
+          p_gender: GenderType;
+          p_category: number;
+        };
+        Returns: Database["public"]["Tables"]["players"]["Row"];
+      };
+      assign_player_category: {
+        Args: { p_player_id: string; p_category: number };
+        Returns: Database["public"]["Tables"]["players"]["Row"];
+      };
+      get_players_by_ids: {
+        Args: { p_player_ids: string[] };
+        Returns: { player_id: string; gender: GenderType | null; category: number | null }[];
+      };
     };
   };
+}
+
+/** Una fila de search_players_for_enrollment (0021) — email es null para un Player sin user_id (importado, sin cuenta). */
+export interface EnrollmentPlayerResult {
+  player_id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  gender: GenderType | null;
+  category: number | null;
 }
 
 /** Una fila de admin_search_users — auth.users.email nunca es null en la práctica, pero Supabase lo tipa nullable. */

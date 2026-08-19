@@ -15,6 +15,8 @@ export interface Player {
   publicProfile: boolean;
   currentRating: number | null;
   currentRatingDeviation: number | null;
+  /** 1=mejor..7, declarada al alta — nunca derivada de currentRating (docs/11_UX_HANDOFF.md §4 #7). */
+  category: number | null;
 }
 
 export const playerProfileSchema = z.object({

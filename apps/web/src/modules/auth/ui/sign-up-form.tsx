@@ -5,8 +5,11 @@ import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { signUpAction, type AuthActionState } from "../application/actions";
 import { Button } from "@/components/ui/button";
-import { Field, Input } from "@/components/ui/input";
+import { Field, Input, Select } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
+import { ChoiceGroup } from "@/components/ui/choice-group";
+
+const CATEGORY_LEVELS = [1, 2, 3, 4, 5, 6, 7];
 
 const initialState: AuthActionState = { error: null };
 
@@ -67,6 +70,35 @@ export function SignUpForm() {
           minLength={8}
           required
         />
+      </Field>
+
+      <Field id="gender" label="Género">
+        <ChoiceGroup
+          name="gender"
+          defaultValue={state.values?.gender}
+          options={[
+            { value: "MALE", label: "Masculino" },
+            { value: "FEMALE", label: "Femenino" },
+            { value: "OTHER", label: "Otro" },
+          ]}
+        />
+      </Field>
+
+      <Field
+        id="category"
+        label="Categoría"
+        hint="Con qué nivel competís hoy — 1 es el más alto. Se puede ajustar más adelante."
+      >
+        <Select id="category" name="category" defaultValue={state.values?.category ?? ""} required>
+          <option value="" disabled>
+            Selecciona tu categoría
+          </option>
+          {CATEGORY_LEVELS.map((level) => (
+            <option key={level} value={level}>
+              Categoría {level}
+            </option>
+          ))}
+        </Select>
       </Field>
 
       <SubmitButton />
