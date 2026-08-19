@@ -3,12 +3,17 @@
 /*
  * Design tokens — Padel Platform
  *
- * Direction: warm near-black/near-white neutrals (never pure #000/#fff, per
- * craft-floor) with a single saturated accent, "court blue" — evoking the
- * blue synthetic-turf courts used on the professional tour, deliberately not
- * the generic AI-purple/gold SaaS default. Restrained color strategy
- * (Operate mode default): the accent is reserved for primary actions,
- * current-state indicators, and links — never decoration.
+ * Ported from padel-platform.html (docs/11_UX_HANDOFF.md §2) — replaces the
+ * earlier "court blue" direction. Single saturated accent, "court lime"
+ * (#B7F13D): reserved for active/live state, selection, and progress —
+ * never decorative. If asked to "make it more colorful" later, that's the
+ * line to hold. Warm near-black/near-white neutrals (never pure #000/#fff).
+ *
+ * success/warning/destructive predate this port and stay as-is — Badge/Alert
+ * across Admin, Discovery, and Partidos already depend on them. pause/cancel
+ * are the two additional state colors the reference HTML defines for match
+ * status (paused/cancelled/disputed); they sit alongside the existing three,
+ * not in place of them.
  *
  * Club branding (docs/07_UX_UI_ARCHITECTURE.md §4) overrides --color-accent
  * and --color-club-* at the surface root via inline style once a club's
@@ -19,17 +24,25 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #fafaf9;
+  --background: #faf9f5;
   --surface: #ffffff;
-  --surface-secondary: #f4f3f1;
-  --foreground: #1c1917;
-  --muted-foreground: #57534e;
-  --border: #e7e5e4;
-  --border-strong: #d6d3d1;
+  --surface-secondary: #f3f2ed;
+  --inverse: #16171a;
+  --inverse-foreground: #f5f5f3;
 
-  --accent: #2454e0;
-  --accent-foreground: #ffffff;
-  --accent-muted: #e8edfc;
+  --foreground: #1d1d1f;
+  --muted-foreground: #6e6e73;
+  --foreground-tertiary: #a6a5a0;
+
+  --border: rgba(20, 20, 18, 0.08);
+  --border-strong: rgba(20, 20, 18, 0.14);
+
+  --accent: #b7f13d;
+  --accent-strong: #92cc18;
+  --accent-foreground: #22330a;
+  --accent-text: #4c6b0f;
+  --accent-muted: #f2fdde;
+  --accent-glow: rgba(146, 204, 24, 0.35);
 
   --success: #15803d;
   --success-foreground: #ffffff;
@@ -41,25 +54,45 @@
   --destructive-foreground: #ffffff;
   --destructive-muted: #fbeaea;
 
+  --pause: #b9821f;
+  --pause-muted: #fbf1de;
+  --cancel: #c0503f;
+  --cancel-muted: #fbeae6;
+
   --ring: var(--accent);
 
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
+  --radius-sm: 0.6875rem; /* 11px — controls */
+  --radius-md: 1rem; /* 16px — components */
+  --radius-lg: 1.5rem; /* 24px — main surfaces */
+  --radius-xl: 1.75rem; /* 28px — largest surfaces (modals, hero cards) */
+
+  --shadow-sm: 0 1px 2px rgba(20, 20, 18, 0.04);
+  --shadow-md: 0 1px 2px rgba(20, 20, 18, 0.03), 0 14px 32px -12px rgba(20, 20, 18, 0.1);
+  --shadow-lg: 0 2px 4px rgba(20, 20, 18, 0.04), 0 28px 56px -18px rgba(20, 20, 18, 0.2);
+  --shadow-glow: 0 0 0 1px var(--accent-strong), 0 8px 24px -6px var(--accent-glow);
+
+  --glass-bg: rgba(255, 255, 255, 0.66);
+  --glass-border: rgba(255, 255, 255, 0.55);
 }
 
 :root.dark {
-  --background: #121110;
-  --surface: #1a1817;
-  --surface-secondary: #211e1c;
-  --foreground: #f5f4f2;
-  --muted-foreground: #a8a29e;
-  --border: #2e2b28;
-  --border-strong: #3a3532;
+  --background: #0e0e10;
+  --surface: #1a1a1c;
+  --surface-secondary: #212123;
+  --inverse: #f2f2f0;
+  --inverse-foreground: #16171a;
 
-  --accent: #5b83ec;
-  --accent-foreground: #0c0b0a;
-  --accent-muted: #1c2540;
+  --foreground: #f2f2f0;
+  --muted-foreground: #999995;
+  --foreground-tertiary: #64645f;
+
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* accent / accent-strong / accent-text / accent-glow: unchanged in dark,
+     same as the reference HTML — only the text-on-accent and tint shift. */
+  --accent-foreground: #1b2606;
+  --accent-muted: #202b08;
 
   --success: #4ade80;
   --success-foreground: #0c0b0a;
@@ -70,22 +103,39 @@
   --destructive: #f27272;
   --destructive-foreground: #0c0b0a;
   --destructive-muted: #2c1717;
+
+  /* pause / cancel base colors: unchanged in dark, only the tint shifts. */
+  --pause-muted: #2b2211;
+  --cancel-muted: #2c1b18;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.35), 0 14px 32px -12px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.4), 0 28px 56px -18px rgba(0, 0, 0, 0.65);
+  /* shadow-glow: unchanged in dark. */
+
+  --glass-bg: rgba(24, 24, 26, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.08);
 }
 
 @theme inline {
-  --font-sans: var(--font-barlow);
-  --font-display: var(--font-barlow-condensed);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-inter);
 
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-secondary: var(--surface-secondary);
+  --color-inverse: var(--inverse);
+  --color-inverse-foreground: var(--inverse-foreground);
   --color-foreground: var(--foreground);
   --color-muted-foreground: var(--muted-foreground);
+  --color-foreground-tertiary: var(--foreground-tertiary);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
 
   --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-text: var(--accent-text);
   --color-accent-muted: var(--accent-muted);
 
   --color-success: var(--success);
@@ -98,11 +148,39 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive-muted: var(--destructive-muted);
 
+  --color-pause: var(--pause);
+  --color-pause-muted: var(--pause-muted);
+  --color-cancel: var(--cancel);
+  --color-cancel-muted: var(--cancel-muted);
+
+  --color-glass: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
+
   --color-ring: var(--ring);
 
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-glow: var(--shadow-glow);
+}
+
+/*
+ * Glassmorphism — floating nav and overlay cards (padel-platform.html: topbar
+ * pill, bottom nav, wizard footer, dropdown menus). blur(20px) saturate(180%)
+ * matches the floating nav exactly; overlay cards in the reference range
+ * 20-24px — bump blur on a per-component basis if one needs to read heavier.
+ * Always pair with --shadow-md/lg, never a hard shadow.
+ */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
 body {
