@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import type { GroupStandingsView } from "../application/getGroupStandings";
 
-/**
- * Función por encima de forma (indicación explícita del prompt) — una tabla
- * simple que se entiende es suficiente por ahora, sin pulir visualmente.
- */
+/** Los 2 primeros de cada grupo avanzan (11_UX_HANDOFF.md §3.2) — puramente posicional sobre el array YA ordenado por calculateStandings, no se reordena ni recalcula nada acá. */
+const QUALIFYING_SPOTS = 2;
+
 export function GroupStandingsTable({ group }: { group: GroupStandingsView }) {
   return (
     <div className="flex flex-col gap-2">
@@ -26,17 +26,23 @@ export function GroupStandingsTable({ group }: { group: GroupStandingsView }) {
               </tr>
             </thead>
             <tbody>
-              {group.standings.map((s, i) => (
+              {group.standings.map((s, i) => {
+                const qualifies = i < QUALIFYING_SPOTS;
+                return (
                 <tr
                   key={s.teamId}
                   className={cn(
                     "border-b border-border last:border-0",
+                    qualifies && "bg-accent-muted/50",
                     s.requiresManualResolution && "bg-warning-muted/40"
                   )}
                 >
                   <td className="py-1.5 pr-3 tabular-nums">{i + 1}</td>
                   <td className="py-1.5 pr-3">
-                    {s.teamName}
+                    <span className="inline-flex items-center gap-2">
+                      {s.teamName}
+                      {qualifies && <Badge tone="accent">Clasifica</Badge>}
+                    </span>
                     {s.requiresManualResolution && (
                       <span className="ml-2 text-xs font-medium text-warning">
                         Empate — requiere resolución manual
@@ -51,7 +57,8 @@ export function GroupStandingsTable({ group }: { group: GroupStandingsView }) {
                   <td className="py-1.5 pr-3 text-right tabular-nums">{s.setDiff}</td>
                   <td className="py-1.5 text-right tabular-nums">{s.gameDiff}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

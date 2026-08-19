@@ -56,15 +56,21 @@ function teamDisplayName(match: BracketDisplayMatch, side: "A" | "B"): string {
   return name ?? "BYE";
 }
 
-function BracketMatchCard({ match }: { match: BracketDisplayMatch }) {
+/** Exportado para reusar en la vista de "una ronda por pantalla" (tournament-phase-flow.tsx) — misma card, dos layouts distintos. */
+export function BracketMatchCard({ match }: { match: BracketDisplayMatch }) {
   const isPending = match.status === null;
   const isReady = match.status === "SCHEDULED" && match.teamAId != null && match.teamBId != null;
+  const isLive = match.status === "IN_PROGRESS";
 
   return (
     <div
       className={cn(
         "flex h-full w-full flex-col justify-center gap-1.5 overflow-hidden rounded-lg border px-3 py-2",
-        isPending ? "border-dashed border-border bg-surface-secondary/40" : "border-border-strong bg-surface"
+        isPending
+          ? "border-dashed border-border bg-surface-secondary/40"
+          : isLive
+            ? "border-accent-strong bg-surface shadow-glow"
+            : "border-border-strong bg-surface"
       )}
     >
       <TeamRow
@@ -81,9 +87,18 @@ function BracketMatchCard({ match }: { match: BracketDisplayMatch }) {
       {match.status && (
         <div className="mt-1 flex items-center gap-1.5">
           <MatchStatusBadge status={match.status} />
+          {isLive && (
+            <span className="flex items-center gap-1 text-xs font-medium text-accent-text">
+              <span className="relative flex size-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-strong opacity-75" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-accent-strong" />
+              </span>
+              En vivo
+            </span>
+          )}
           {isReady && (
-            <span className="flex items-center gap-1 text-xs font-medium text-accent">
-              <span className="size-1.5 rounded-full bg-accent" />
+            <span className="flex items-center gap-1 text-xs font-medium text-accent-text">
+              <span className="size-1.5 rounded-full bg-accent-strong" />
               Listo para jugar
             </span>
           )}

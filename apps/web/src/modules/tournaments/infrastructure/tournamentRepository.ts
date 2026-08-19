@@ -871,3 +871,46 @@ export async function fetchWizardRoster(tournamentId: string): Promise<EnrolledT
       };
     });
 }
+
+/* =============================================================
+   Torneo (bracket) — franja "en vivo / próximos"
+   Aditiva para redesign/torneo-bracket — no toca ninguna query
+   existente de esta pantalla (fetchBracketForCategory, fetchGroupsFor
+   Category, etc. siguen intactas).
+============================================================= */
+
+export interface TournamentLiveMatch {
+  matchId: string;
+  status: MatchRow["status"];
+  scheduledStart: string | null;
+  teamAName: string;
+  teamBName: string;
+}
+
+/** matches.tournament_id ya existe en la fila (independiente de si el partido es de grupos o de bracket) — un solo query, sin pasar por categoría/fase. */
+export async function fetchLiveAndUpcomingMatches(tournamentId: string): Promise<TournamentLiveMatch[]> {
+  const supabase = await createClient();
+  const { data: matches, error } = await supabase
+    .from("matches")
+    .select("id, status, scheduled_start, team_a_id, team_b_id")
+    .eq("tournament_id", tournamentId)
+    .in("status", ["IN_PROGRESS", "SCHEDULED"])
+    .order("scheduled_start", { ascending: true, nullsFirst: false });
+  if (error) throw new Error(error.message);
+  if (!matches || matches.length === 0) return [];
+
+  const teamIds = Array.from(
+    new Set(matches.flatMap((m) => [m.team_a_id, m.team_b_id]).filter((id): id is string => id != null))
+  );
+  const teamNames = await fetchTeamNames(teamIds);
+
+  return matches
+    .filter((m) => m.team_a_id && m.team_b_id)
+    .map((m) => ({
+      matchId: m.id,
+      status: m.status,
+      scheduledStart: m.scheduled_start,
+      teamAName: teamNames.get(m.team_a_id!) ?? "Equipo",
+      teamBName: teamNames.get(m.team_b_id!) ?? "Equipo",
+    }));
+}
