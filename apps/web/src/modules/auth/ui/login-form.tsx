@@ -2,7 +2,6 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import Link from "next/link";
 import { signInAction, type AuthActionState } from "../application/actions";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
@@ -48,13 +47,6 @@ export function LoginForm() {
       </Field>
 
       <SubmitButton />
-
-      <p className="text-center text-sm text-muted-foreground">
-        ¿No tienes cuenta?{" "}
-        <Link href="/registro" className="font-medium text-accent hover:underline">
-          Regístrate
-        </Link>
-      </p>
     </form>
   );
 }

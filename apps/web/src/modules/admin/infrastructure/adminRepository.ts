@@ -1,74 +1,157 @@
 import { createClient } from "@/lib/supabase/server";
-import type { AdminUserSearchResult, AppRole, Database } from "@/lib/supabase/database.types";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { AppRole } from "@/lib/supabase/database.types";
 
-type UserRoleRow = Database["public"]["Tables"]["user_roles"]["Row"];
-type AuditLogRow = Database["public"]["Tables"]["audit_log"]["Row"];
-
-/** admin_search_users ya rechaza a quien no sea is_admin() — este repositorio no reimplementa esa autorización. */
-export async function searchUsers(query: string): Promise<AdminUserSearchResult[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("admin_search_users", { p_query: query });
-  if (error) throw new Error(error.message);
-  return data ?? [];
+export interface AccountRow {
+  userId: string;
+  email: string | null;
+  role: AppRole;
+  scopeId: string | null;
+  scopeName: string | null;
+  isActive: boolean;
 }
 
-/** Directo vía RLS (`user_roles_select`, is_admin()) — no hace falta RPC para leer. */
-export async function fetchRolesForUserId(userId: string): Promise<UserRoleRow[]> {
+/** Cruza role_assignments (RLS ya lo limita a admin) con clubs/organizers y con auth.users (vía admin client, único lugar donde vive el email). */
+export async function fetchAccounts(): Promise<AccountRow[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at");
-  if (error) throw new Error(error.message);
-  return data ?? [];
+  const [{ data: roles, error: rolesError }, { data: clubs }, { data: organizers }] = await Promise.all([
+    supabase.from("role_assignments").select("user_id, role, club_id, organizer_id"),
+    supabase.from("clubs").select("id, name, is_active"),
+    supabase.from("organizers").select("id, name, is_active"),
+  ]);
+  if (rolesError) throw new Error(rolesError.message);
+
+  const clubById = new Map((clubs ?? []).map((c) => [c.id, c]));
+  const organizerById = new Map((organizers ?? []).map((o) => [o.id, o]));
+  const admin = createAdminClient();
+
+  return Promise.all(
+    (roles ?? []).map(async (r): Promise<AccountRow> => {
+      const { data } = await admin.auth.admin.getUserById(r.user_id);
+      const scope = r.club_id ? clubById.get(r.club_id) : r.organizer_id ? organizerById.get(r.organizer_id) : null;
+      return {
+        userId: r.user_id,
+        email: data.user?.email ?? null,
+        role: r.role,
+        scopeId: r.club_id ?? r.organizer_id ?? null,
+        scopeName: scope?.name ?? null,
+        isActive: scope ? scope.is_active : !data.user?.banned_until,
+      };
+    })
+  );
 }
 
-export async function grantRole(input: {
+/**
+ * Activar/desactivar toca dos cosas: el is_active de la fila club/organizer
+ * (estado de negocio, lo que ve el admin en la lista) y el ban del propio
+ * auth.users (la aplicación real — sin esto, desactivar sería solo
+ * cosmético y la cuenta podría seguir iniciando sesión).
+ */
+export async function setAccountActive(input: {
   userId: string;
   role: AppRole;
-  clubId: string | null;
-  organizerId: string | null;
-}): Promise<UserRoleRow> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("admin_grant_role", {
-    p_user_id: input.userId,
-    p_role: input.role,
-    p_club_id: input.clubId,
-    p_organizer_id: input.organizerId,
+  scopeId: string | null;
+  active: boolean;
+}): Promise<void> {
+  const admin = createAdminClient();
+
+  if (input.scopeId && (input.role === "CLUB" || input.role === "ORGANIZADOR")) {
+    const table = input.role === "CLUB" ? "clubs" : "organizers";
+    const { error } = await admin.from(table).update({ is_active: input.active }).eq("id", input.scopeId);
+    if (error) throw new Error(error.message);
+  }
+
+  const { error: banError } = await admin.auth.admin.updateUserById(input.userId, {
+    ban_duration: input.active ? "none" : "876000h",
   });
-  if (error) throw new Error(error.message);
-  return data;
+  if (banError) throw new Error(banError.message);
 }
 
-export async function revokeRole(roleId: string): Promise<void> {
+/**
+ * Crea la fila clubs/organizers y dispara la invitación real por email vía
+ * Supabase Auth (auth.admin.inviteUserByEmail) — el token que crea la
+ * cuenta lo genera y valida Supabase, no este código (ver 0004_invite_rpc.sql).
+ * pending_invites es solo metadata de negocio: qué rol/alcance asignar
+ * cuando se acepte. No es atómico con el insert de clubs/organizers (dos
+ * sistemas distintos no pueden compartir transacción) — si falla acá, el
+ * club/organizer queda huérfano visible en /admin/invitaciones, no oculto.
+ */
+export async function createAccountAndInvite(input: {
+  role: "CLUB" | "ORGANIZADOR";
+  name: string;
+  email: string;
+  invitedBy: string;
+  redirectTo: string;
+}): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("admin_revoke_role", { p_role_id: roleId });
-  if (error) throw new Error(error.message);
+  const admin = createAdminClient();
+
+  const table = input.role === "CLUB" ? "clubs" : "organizers";
+  const { data: entity, error: entityError } = await supabase
+    .from(table)
+    .insert({ name: input.name })
+    .select("id")
+    .single();
+  if (entityError) throw new Error(entityError.message);
+
+  const clubId = input.role === "CLUB" ? entity.id : null;
+  const organizerId = input.role === "ORGANIZADOR" ? entity.id : null;
+
+  const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(input.email, {
+    data: { invited_role: input.role, invited_club_id: clubId, invited_organizer_id: organizerId },
+    redirectTo: input.redirectTo,
+  });
+  if (inviteError) throw new Error(inviteError.message);
+
+  const { error: pendingError } = await supabase.from("pending_invites").insert({
+    email: input.email,
+    role: input.role,
+    club_id: clubId,
+    organizer_id: organizerId,
+    invited_by: input.invitedBy,
+    auth_user_id: inviteData.user?.id ?? null,
+  });
+  if (pendingError) throw new Error(pendingError.message);
 }
 
-/** Directo vía RLS (`audit_log_select`, is_admin()). */
-export async function fetchAuditLog(entityType: string | null): Promise<AuditLogRow[]> {
-  const supabase = await createClient();
-  let query = supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(100);
-  if (entityType) query = query.eq("entity_type", entityType);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data ?? [];
+export interface PendingInviteRow {
+  id: string;
+  email: string;
+  role: AppRole;
+  scopeName: string | null;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
 }
 
-/** Público (`clubs_select using (true)`) — usado para el selector de club al otorgar CLUB_OWNER/CLUB_MANAGER. */
-export async function fetchClubsForSelect(): Promise<{ id: string; name: string }[]> {
+export async function fetchPendingInvites(): Promise<PendingInviteRow[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("clubs").select("id, name").order("name");
+  const [{ data: invites, error }, { data: clubs }, { data: organizers }] = await Promise.all([
+    supabase
+      .from("pending_invites")
+      .select("id, email, role, club_id, organizer_id, status, expires_at, created_at")
+      .order("created_at", { ascending: false }),
+    supabase.from("clubs").select("id, name"),
+    supabase.from("organizers").select("id, name"),
+  ]);
   if (error) throw new Error(error.message);
-  return data ?? [];
+
+  const clubById = new Map((clubs ?? []).map((c) => [c.id, c.name]));
+  const organizerById = new Map((organizers ?? []).map((o) => [o.id, o.name]));
+
+  return (invites ?? []).map((i) => ({
+    id: i.id,
+    email: i.email,
+    role: i.role,
+    scopeName: i.club_id ? (clubById.get(i.club_id) ?? null) : i.organizer_id ? (organizerById.get(i.organizer_id) ?? null) : null,
+    status: i.status,
+    expiresAt: i.expires_at,
+    createdAt: i.created_at,
+  }));
 }
 
-/** Público (`organizers_select using (true)`) — usado para el selector de organizador al otorgar ORGANIZER. */
-export async function fetchOrganizersForSelect(): Promise<{ id: string; name: string }[]> {
+export async function revokeInvite(inviteId: string): Promise<void> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("organizers").select("id, name").order("name");
+  const { error } = await supabase.from("pending_invites").update({ status: "REVOKED" }).eq("id", inviteId);
   if (error) throw new Error(error.message);
-  return data ?? [];
 }

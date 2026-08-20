@@ -1,69 +1,93 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { fetchAuthenticatedUser } from "@/modules/auth/infrastructure/authRepository";
+import { inviteSchema } from "../domain/invite";
+import { createAccountAndInvite, revokeInvite, setAccountActive } from "../infrastructure/adminRepository";
 import type { AppRole } from "@/lib/supabase/database.types";
-import { grantRole, revokeRole } from "../infrastructure/adminRepository";
+import { fetchAuthenticatedUser } from "@/modules/auth/infrastructure/authRepository";
+import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
+import { isAdmin } from "@/modules/auth/domain/roles";
 
-export interface GrantRoleState {
+export interface AdminActionState {
   error: string | null;
   success: boolean;
 }
 
-/**
- * La autorización real la impone la RPC (`admin_grant_role`, is_admin()) —
- * este chequeo de sesión solo evita una llamada innecesaria y da un mensaje
- * más claro que el error crudo de Postgres.
- */
-export async function grantRoleAction(
-  userId: string,
-  _prev: GrantRoleState,
+export interface SimpleActionState {
+  error: string | null;
+}
+
+async function requireAdmin(): Promise<{ userId: string } | { error: string }> {
+  const context = await getCurrentUserContext();
+  if (!context) return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+  if (!isAdmin(context.roles)) return { error: "No tienes permisos de administrador." };
+  return { userId: context.userId };
+}
+
+export async function inviteAction(
+  _prev: AdminActionState,
   formData: FormData
-): Promise<GrantRoleState> {
-  const { user } = await fetchAuthenticatedUser();
-  if (!user) return { error: "Tu sesión expiró. Vuelve a iniciar sesión.", success: false };
+): Promise<AdminActionState> {
+  const auth = await requireAdmin();
+  if ("error" in auth) return { error: auth.error, success: false };
 
-  const role = formData.get("role") as AppRole;
-  const clubId = (formData.get("clubId") as string) || null;
-  const organizerId = (formData.get("organizerId") as string) || null;
-
-  try {
-    await grantRole({ userId, role, clubId, organizerId });
-  } catch (e) {
-    return {
-      error: e instanceof Error ? e.message : "No se pudo otorgar el rol. Intenta de nuevo.",
-      success: false,
-    };
+  const parsed = inviteSchema.safeParse({
+    role: formData.get("role"),
+    name: formData.get("name"),
+    email: formData.get("email"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Revisa los datos ingresados.", success: false };
   }
 
-  revalidatePath("/dashboard/admin");
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+  try {
+    await createAccountAndInvite({
+      role: parsed.data.role,
+      name: parsed.data.name,
+      email: parsed.data.email,
+      invitedBy: auth.userId,
+      redirectTo: `${siteUrl}/auth/callback?next=/invitacion`,
+    });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo enviar la invitación.", success: false };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/invitaciones");
   return { error: null, success: true };
 }
 
-export interface RevokeRoleState {
-  error: string | null;
-  success: boolean;
-}
-
-/* eslint-disable @typescript-eslint/no-unused-vars */
-export async function revokeRoleAction(
-  roleId: string,
-  _prev: RevokeRoleState,
-  _formData: FormData
-): Promise<RevokeRoleState> {
-  /* eslint-enable @typescript-eslint/no-unused-vars */
+export async function setAccountActiveAction(
+  userId: string,
+  role: AppRole,
+  scopeId: string | null,
+  active: boolean
+): Promise<SimpleActionState> {
   const { user } = await fetchAuthenticatedUser();
-  if (!user) return { error: "Tu sesión expiró. Vuelve a iniciar sesión.", success: false };
+  if (!user) return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
 
   try {
-    await revokeRole(roleId);
+    await setAccountActive({ userId, role, scopeId, active });
   } catch (e) {
-    return {
-      error: e instanceof Error ? e.message : "No se pudo revocar el rol. Intenta de nuevo.",
-      success: false,
-    };
+    return { error: e instanceof Error ? e.message : "No se pudo actualizar la cuenta." };
   }
 
-  revalidatePath("/dashboard/admin");
-  return { error: null, success: true };
+  revalidatePath("/admin");
+  return { error: null };
+}
+
+export async function revokeInviteAction(inviteId: string): Promise<SimpleActionState> {
+  const { user } = await fetchAuthenticatedUser();
+  if (!user) return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+
+  try {
+    await revokeInvite(inviteId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo revocar la invitación." };
+  }
+
+  revalidatePath("/admin/invitaciones");
+  return { error: null };
 }

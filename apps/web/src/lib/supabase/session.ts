@@ -2,21 +2,21 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "./database.types";
 
-const AUTH_PATHS = ["/login", "/registro"];
+const AUTH_PATHS = ["/login"];
 
 /**
- * Rutas públicas de verdad (anon, sin sesión) — a diferencia de AUTH_PATHS,
- * no redirigen a "/" si el visitante SÍ está logueado; simplemente no
- * exigen sesión. Discovery (docs/08_MVP_SCOPE.md) es la primera.
+ * Rutas del flujo de invitación — a diferencia de AUTH_PATHS, ni exigen
+ * sesión previa (el callback recién la crea) ni redirigen si el visitante
+ * SÍ está logueado; este flujo maneja su propio estado de sesión.
  */
-const PUBLIC_PATHS = ["/descubrir"];
+const INVITE_PATHS = ["/invitacion", "/auth/callback", "/bienvenida"];
 
 /**
  * Refreshes the Supabase session on every request (required by @supabase/ssr
  * so server components see a valid token) and gates the routes that require
- * a session. Role-specific gating (club/organizer vs. player) happens in the
- * relevant layout server components, not here — that needs a DB read this
- * middleware intentionally avoids doing on every request.
+ * a session. Role-specific gating (admin vs. club vs. organizador) happens
+ * in the relevant layout server components, not here — that needs a DB read
+ * this middleware intentionally avoids doing on every request.
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -48,9 +48,13 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthPath = AUTH_PATHS.some((path) => pathname.startsWith(path));
-  const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
+  const isInvitePath = INVITE_PATHS.some((path) => pathname.startsWith(path));
 
-  if (!user && !isAuthPath && !isPublicPath) {
+  if (isInvitePath) {
+    return response;
+  }
+
+  if (!user && !isAuthPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
@@ -59,7 +63,7 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isAuthPath) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/admin";
     url.search = "";
     return NextResponse.redirect(url);
   }

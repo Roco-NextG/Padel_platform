@@ -4,7 +4,7 @@ import type { RoleAssignment } from "../domain/roles";
 export async function fetchRolesForUser(userId: string): Promise<RoleAssignment[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("user_roles")
+    .from("role_assignments")
     .select("role, club_id, organizer_id")
     .eq("user_id", userId);
 
