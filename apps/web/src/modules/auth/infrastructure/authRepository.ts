@@ -16,3 +16,9 @@ export async function fetchAuthenticatedUser() {
   const { data, error } = await supabase.auth.getUser();
   return { user: data.user, error };
 }
+
+/** "Última vez que usó la app" — se actualiza solo en sign-in, no en cada request (account_activity_rw permite que cada cuenta escriba su propia fila). */
+export async function touchAccountActivity(userId: string): Promise<void> {
+  const supabase = await createClient();
+  await supabase.from("account_activity").upsert({ user_id: userId, last_active_at: new Date().toISOString() });
+}

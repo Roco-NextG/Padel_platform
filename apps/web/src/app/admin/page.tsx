@@ -1,19 +1,31 @@
 import type { Metadata } from "next";
-import { getAccounts } from "@/modules/admin/application/getAdminData";
-import { UserList } from "@/modules/admin/ui/user-list";
+import Link from "next/link";
+import { getOverviewData } from "@/modules/admin/application/getOverviewData";
+import { fetchPlans } from "@/modules/admin/infrastructure/billingRepository";
+import { KpiCards } from "@/modules/admin/ui/kpi-cards";
+import { PlatformAccountList } from "@/modules/admin/ui/platform-account-list";
+import { Button } from "@/components/ui/button";
 
-export const metadata: Metadata = { title: "Usuarios — Admin — Padel Platform" };
+export const metadata: Metadata = { title: "Overview — Admin" };
 
-export default async function AdminUsersPage() {
-  const accounts = await getAccounts();
+export default async function AdminOverviewPage() {
+  const [{ kpis, accounts }, plans] = await Promise.all([getOverviewData(), fetchPlans()]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Usuarios</h1>
-        <p className="text-sm text-muted-foreground">Todas las cuentas de la plataforma — admin, clubes y organizadores.</p>
+    <div className="flex flex-col gap-8">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
+          <p className="text-sm text-muted-foreground">Estado general de la plataforma.</p>
+        </div>
+        <Link href="/admin/usuarios/nuevo">
+          <Button>New user</Button>
+        </Link>
       </div>
-      <UserList accounts={accounts} />
+
+      <KpiCards kpis={kpis} />
+
+      <PlatformAccountList accounts={accounts} plans={plans.filter((p) => p.isActive)} />
     </div>
   );
 }

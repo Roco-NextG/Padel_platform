@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { signInSchema } from "../domain/schemas";
-import { signInWithPassword, signOutUser } from "../infrastructure/authRepository";
+import { signInWithPassword, signOutUser, touchAccountActivity } from "../infrastructure/authRepository";
 import { homePathForRoles } from "../domain/roles";
 import { translateAuthError } from "../domain/authErrors";
 import { getCurrentUserContext } from "./getCurrentUserContext";
@@ -31,6 +31,8 @@ export async function signInAction(
   if (!data.user) {
     return { error: "No se pudo iniciar sesión. Intenta de nuevo.", values: { email } };
   }
+
+  await touchAccountActivity(data.user.id);
 
   const context = await getCurrentUserContext();
   redirect(context ? homePathForRoles(context.roles) : "/login");
