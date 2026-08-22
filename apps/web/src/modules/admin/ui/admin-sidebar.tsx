@@ -11,6 +11,7 @@ import {
   ChartLineUp,
   ListBullets,
   GearSix,
+  ArrowSquareOut,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
@@ -75,6 +76,19 @@ export function AdminSidebar() {
       ))}
       <NavGroup label="Suscripciones" items={SUSCRIPCIONES_ITEMS} pathname={pathname} />
       <NavGroup label="System" items={SYSTEM_ITEMS} pathname={pathname} />
+
+      {/* Solo se ve acá porque AdminSidebar solo renderiza para admins
+          confirmados (el gate real vive en admin/layout.tsx) — no hace
+          falta repetir el chequeo de rol en este componente. */}
+      <div className="mt-auto border-t border-border pt-2">
+        <Link
+          href="/bienvenida"
+          className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+        >
+          <ArrowSquareOut className="size-[18px]" />
+          Ver panel de usuario
+        </Link>
+      </div>
     </nav>
   );
 }

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
-import { roleLabel } from "@/modules/auth/domain/roles";
+import { isAdmin, roleLabel } from "@/modules/auth/domain/roles";
 import { signOutAction } from "@/modules/auth/application/actions";
 import { Button } from "@/components/ui/button";
 
@@ -15,6 +17,16 @@ export default async function BienvenidaPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {isAdmin(context.roles) && (
+        <Link
+          href="/admin"
+          className="inline-flex items-center gap-1.5 self-start text-sm font-medium text-accent-text hover:underline"
+        >
+          <ArrowSquareOut className="size-4" />
+          Ir al panel de admin
+        </Link>
+      )}
+
       <div className="flex flex-col gap-1.5">
         <h1 className="text-2xl font-semibold tracking-tight">Tu cuenta está lista</h1>
         <p className="text-sm text-muted-foreground">
