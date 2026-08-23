@@ -61,7 +61,13 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthPath) {
+  // Si /login trae authError (ej. invite_expired desde /auth/callback), no
+  // rebotamos a un usuario ya logueado sin mostrárselo primero — antes esto
+  // mandaba a cualquiera que probara un link de invitación desde una
+  // sesión ya activa (el caso típico: el propio admin probando sus propias
+  // invitaciones) directo a /admin sin ver el mensaje real, indistinguible
+  // de "el link me llevó al panel de admin".
+  if (user && isAuthPath && !request.nextUrl.searchParams.has("authError")) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin";
     url.search = "";
