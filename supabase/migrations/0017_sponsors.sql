@@ -32,15 +32,23 @@ grant select on public.sponsors to anon;
 -- ---------------------------------------------------------------------------
 -- Storage: bucket sponsor-logos — público de lectura (logos se muestran sin
 -- sesión, mismo criterio que el resto de imágenes de marca de la app).
--- Nota: la creación del bucket vía SQL puede necesitar verificación aparte
--- en el Dashboard de Supabase (Storage → Buckets) si el Storage extension
--- no está expuesto igual a través del SQL Editor — no asumir que esta
--- sentencia sola es suficiente sin confirmarlo ahí.
+--
+-- storage.objects/storage.buckets viven en el schema `storage`, NO `public`
+-- — el DROP SCHEMA public CASCADE del reset (0001_reset.sql) nunca los
+-- tocó. Las policies de sponsor-logos del esquema viejo (pre-reset,
+-- b0362d4:0022_sponsors.sql) siguen ahí. drop policy if exists antes de
+-- cada create, mismo patrón que el resto de este proyecto usa para
+-- resultar idempotente.
 -- ---------------------------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values ('sponsor-logos', 'sponsor-logos', true)
 on conflict (id) do nothing;
 
+drop policy if exists sponsor_logos_read on storage.objects;
 create policy sponsor_logos_read on storage.objects for select using (bucket_id = 'sponsor-logos');
+
+drop policy if exists sponsor_logos_write on storage.objects;
 create policy sponsor_logos_write on storage.objects for insert with check (bucket_id = 'sponsor-logos' and public.is_tournament_staff());
+
+drop policy if exists sponsor_logos_delete on storage.objects;
 create policy sponsor_logos_delete on storage.objects for delete using (bucket_id = 'sponsor-logos' and public.is_tournament_staff());
