@@ -15,5 +15,11 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/login`);
+  // Sin `code` (Supabase mandó el error como fragmento #error=... en vez de
+  // ?code=..., que el servidor nunca ve) o el exchange falló — el caso
+  // típico es un link de invitación vencido o ya usado (a veces por el
+  // pre-fetch de seguridad de Gmail consumiendo el link antes del click
+  // humano). authError=invite_expired le da a /login un mensaje claro en
+  // vez de un bounce mudo.
+  return NextResponse.redirect(`${origin}/login?authError=invite_expired`);
 }

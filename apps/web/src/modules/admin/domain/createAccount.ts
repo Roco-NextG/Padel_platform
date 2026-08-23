@@ -17,13 +17,13 @@ export const createAccountSchema = z.discriminatedUnion("tipoUsuario", [
     entityCity: z.string().trim().optional(),
     entityContactEmail: z.string().trim().email("Ingresa un email válido.").optional().or(z.literal("")),
   }),
+  // El Organizador es solo una persona — sin datos de entidad propios
+  // (nombre/ciudad/email general), a diferencia del Club. El nombre de su
+  // fila `organizers` se deriva de firstName/lastName en createAccountWithInvite.
   z.object({
     tipoUsuario: z.literal("ORGANIZADOR"),
     ...baseFields,
     planId: z.string().uuid().nullable(),
-    entityName: z.string().trim().min(2, "Ingresa el nombre del organizador."),
-    entityCity: z.string().trim().optional(),
-    entityContactEmail: z.string().trim().email("Ingresa un email válido.").optional().or(z.literal("")),
   }),
 ]);
 

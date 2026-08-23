@@ -176,12 +176,17 @@ export async function createAccountWithInvite(input: CreateAccountInput, invited
 
   if (input.tipoUsuario === "CLUB" || input.tipoUsuario === "ORGANIZADOR") {
     const table = input.tipoUsuario === "CLUB" ? "clubs" : "organizers";
+    // El Organizador no tiene datos de entidad propios (nombre/ciudad/email
+    // general) — es solo una persona, a diferencia del Club, que sí es una
+    // entidad con esos datos. El nombre de la fila `organizers` se deriva
+    // del nombre de la persona para que la tabla siga teniendo un `name`
+    // (not null), sin pedirle al admin un campo redundante.
     const { data: entity, error: entityError } = await supabase
       .from(table)
       .insert({
-        name: input.entityName,
-        city: input.entityCity || null,
-        contact_email: input.entityContactEmail || null,
+        name: input.tipoUsuario === "CLUB" ? input.entityName : `${input.firstName} ${input.lastName}`,
+        city: input.tipoUsuario === "CLUB" ? input.entityCity || null : null,
+        contact_email: input.tipoUsuario === "CLUB" ? input.entityContactEmail || null : null,
         contact_first_name: input.firstName,
         contact_last_name: input.lastName,
         contact_phone: input.phone,
@@ -326,4 +331,45 @@ export async function changeAccountPlan(
     payment_status_after: currentStatus,
   });
   if (eventError) throw new Error(eventError.message);
+}
+
+export interface AdminAccount {
+  userId: string;
+  email: string | null;
+  createdAt: string;
+}
+
+/**
+ * Los admins no son clubs/organizers/players — son solo una fila de
+ * role_assignments sin scope, así que no aparecen en fetchAllPlatformUsers
+ * (esa lista se arma recorriendo esas 3 tablas de negocio, no
+ * role_assignments). Esto es deliberado: ni el filtro que pidió el usuario
+ * (All/Active/Players/Clubs/Managers/Inactive) tiene un "Admin", ni tiene
+ * sentido que un admin cuente en los números de ingresos — pero eso mismo
+ * dejaba sin forma de ver quién es admin o de revocarlo, que es lo que
+ * resuelve esta consulta separada.
+ */
+export async function fetchAdmins(): Promise<AdminAccount[]> {
+  const supabase = await createClient();
+  const { data: roles, error } = await supabase
+    .from("role_assignments")
+    .select("user_id, created_at")
+    .eq("role", "ADMIN")
+    .order("created_at");
+  if (error) throw new Error(error.message);
+
+  const admin = createAdminClient();
+  const rows = await Promise.all(
+    (roles ?? []).map(async (r) => {
+      const { data } = await admin.auth.admin.getUserById(r.user_id);
+      return { userId: r.user_id, email: data.user?.email ?? null, createdAt: r.created_at };
+    })
+  );
+  return rows;
+}
+
+export async function revokeAdmin(userId: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("role_assignments").delete().eq("user_id", userId).eq("role", "ADMIN");
+  if (error) throw new Error(error.message);
 }

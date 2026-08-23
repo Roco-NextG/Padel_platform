@@ -8,6 +8,7 @@ import {
   createAccountWithInvite,
   deleteAccount,
   makeAdmin,
+  revokeAdmin,
   setAccountActive,
   type PlatformAccountType,
 } from "../infrastructure/usersRepository";
@@ -46,6 +47,10 @@ export async function createUserAction(
   };
   if (tipoUsuario === "CLUB" || tipoUsuario === "ORGANIZADOR") {
     raw.planId = formData.get("planId") || null;
+  }
+  // El Organizador es solo una persona — sin datos de entidad propios,
+  // a diferencia del Club (ver create-user-form.tsx y createAccountWithInvite).
+  if (tipoUsuario === "CLUB") {
     raw.entityName = formData.get("entityName");
     raw.entityCity = formData.get("entityCity") || undefined;
     raw.entityContactEmail = formData.get("entityContactEmail") || "";
@@ -67,7 +72,7 @@ export async function createUserAction(
   revalidatePath("/admin");
   revalidatePath("/admin/usuarios");
   revalidatePath("/admin/invitaciones");
-  redirect("/admin/usuarios");
+  redirect("/admin/usuarios?created=1");
 }
 
 export async function makeAdminAction(userId: string): Promise<SimpleActionState> {
@@ -78,6 +83,23 @@ export async function makeAdminAction(userId: string): Promise<SimpleActionState
     await makeAdmin(userId);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo otorgar el rol de admin." };
+  }
+
+  revalidatePath("/admin/usuarios");
+  return { error: null };
+}
+
+export async function revokeAdminAction(userId: string): Promise<SimpleActionState> {
+  const auth = await requireAdmin();
+  if ("error" in auth) return { error: auth.error };
+  if (auth.userId === userId) {
+    return { error: "No podés revocarte el rol de admin a vos mismo — pedile a otro admin que lo haga." };
+  }
+
+  try {
+    await revokeAdmin(userId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo revocar el rol de admin." };
   }
 
   revalidatePath("/admin/usuarios");

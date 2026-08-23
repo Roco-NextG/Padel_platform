@@ -14,6 +14,11 @@ export interface AuthActionState {
   };
 }
 
+/** Solo rutas internas ("/algo") — nunca "//algo" (host-relative, abre la puerta a redirigir a otro dominio) ni una URL absoluta. */
+function isSafeInternalPath(path: string): boolean {
+  return path.startsWith("/") && !path.startsWith("//");
+}
+
 export async function signInAction(
   _prev: AuthActionState,
   formData: FormData
@@ -33,6 +38,14 @@ export async function signInAction(
   }
 
   await touchAccountActivity(data.user.id);
+
+  // Si el login vino de un "next" explícito (ej. el link "Ver panel de
+  // usuario" del sidebar de admin, que bota a /login si no hay sesión
+  // activa), respetarlo — solo caer al home por rol cuando no hay uno.
+  const next = String(formData.get("next") ?? "");
+  if (next && isSafeInternalPath(next)) {
+    redirect(next);
+  }
 
   const context = await getCurrentUserContext();
   redirect(context ? homePathForRoles(context.roles) : "/login");

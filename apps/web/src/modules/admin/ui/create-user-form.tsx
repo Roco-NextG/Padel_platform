@@ -23,7 +23,8 @@ function SubmitButton() {
 export function CreateUserForm({ plans }: { plans: PlanRow[] }) {
   const [state, formAction] = useActionState(createUserAction, initialState);
   const [tipoUsuario, setTipoUsuario] = useState<"CLUB" | "ORGANIZADOR" | "JUGADOR">("CLUB");
-  const isEntity = tipoUsuario === "CLUB" || tipoUsuario === "ORGANIZADOR";
+  const hasPlan = tipoUsuario === "CLUB" || tipoUsuario === "ORGANIZADOR";
+  const isClub = tipoUsuario === "CLUB";
 
   return (
     <form action={formAction} className="flex max-w-lg flex-col gap-5">
@@ -60,15 +61,13 @@ export function CreateUserForm({ plans }: { plans: PlanRow[] }) {
         <Input id="email" name="email" type="email" required />
       </Field>
 
-      {isEntity && (
+      {isClub && (
         <>
           <div className="flex flex-col gap-1.5 border-t border-border pt-5">
-            <span className="text-sm font-medium text-foreground">
-              Datos del {tipoUsuario === "CLUB" ? "club" : "organizador"}
-            </span>
+            <span className="text-sm font-medium text-foreground">Datos del club</span>
           </div>
 
-          <Field id="entityName" label={tipoUsuario === "CLUB" ? "Nombre del club" : "Nombre del organizador"}>
+          <Field id="entityName" label="Nombre del club">
             <Input id="entityName" name="entityName" required />
           </Field>
 
@@ -79,18 +78,20 @@ export function CreateUserForm({ plans }: { plans: PlanRow[] }) {
           <Field id="entityContactEmail" label="Email de contacto general" optional hint="Distinto del email de inicio de sesión de arriba.">
             <Input id="entityContactEmail" name="entityContactEmail" type="email" />
           </Field>
-
-          <Field id="planId" label="Plan" optional>
-            <Select id="planId" name="planId" defaultValue="">
-              <option value="">Free</option>
-              {plans.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
         </>
+      )}
+
+      {hasPlan && (
+        <Field id="planId" label="Plan" optional>
+          <Select id="planId" name="planId" defaultValue="">
+            <option value="">Free</option>
+            {plans.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
       )}
 
       <div>
