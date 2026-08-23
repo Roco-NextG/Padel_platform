@@ -104,9 +104,11 @@ function AccountRow({
                   Hacer admin
                 </Button>
               )}
-              <Button type="button" variant="destructive" size="sm" loading={isPending} onClick={handleDelete}>
-                Borrar
-              </Button>
+              {account.accountType === "JUGADOR" && (
+                <Button type="button" variant="destructive" size="sm" loading={isPending} onClick={handleDelete}>
+                  Borrar
+                </Button>
+              )}
             </>
           )}
         </div>
