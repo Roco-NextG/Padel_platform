@@ -252,13 +252,27 @@ export async function makeAdmin(userId: string): Promise<void> {
  * pending_invites), después el propio auth.users (cascada a
  * role_assignments/account_activity — seguro gracias al fix de FK en
  * 0005_billing_schema.sql).
+ *
+ * Solo JUGADOR admite borrado real — clubs/organizers NO tienen policy de
+ * delete a propósito (0003_rls.sql: "desactivar via is_active, nunca borrar
+ * la fila"), porque son entidades con historial (canchas, torneos, rosters,
+ * facturación) que no se pueden descartar sin dejar huérfanos. Antes esta
+ * función igual lo intentaba: el delete de la fila fallaba en silencio por
+ * RLS (0 filas afectadas, sin error), pero después borraba auth.users de
+ * todos modos — dejaba la cuenta a medio borrar (entidad huérfana sin
+ * usuario) y en la UI parecía que "no dejaba borrar" sin explicar por qué.
  */
 export async function deleteAccount(accountType: PlatformAccountType, entityId: string, userId: string | null): Promise<void> {
+  if (accountType === "CLUB" || accountType === "ORGANIZADOR") {
+    throw new Error(
+      "Las cuentas de Club y Organizador no se pueden borrar — tienen historial asociado (canchas, torneos, facturación). Usa \"Desactivar\" en su lugar."
+    );
+  }
+
   const supabase = await createClient();
   const admin = createAdminClient();
 
-  const table = accountType === "CLUB" ? "clubs" : accountType === "ORGANIZADOR" ? "organizers" : "players";
-  const { error: entityError } = await supabase.from(table).delete().eq("id", entityId);
+  const { error: entityError } = await supabase.from("players").delete().eq("id", entityId);
   if (entityError) throw new Error(entityError.message);
 
   if (userId) {
