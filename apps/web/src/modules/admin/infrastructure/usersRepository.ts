@@ -135,6 +135,32 @@ export async function fetchAllPlatformUsers(): Promise<PlatformAccount[]> {
   );
 }
 
+export interface PlayerEngagement {
+  totalPlayers: number;
+  activePlayersLast30d: number;
+}
+
+/**
+ * Consulta liviana para el KPI de engagement — a diferencia de
+ * fetchAllPlatformUsers, no hace una llamada a Auth Admin por usuario (acá
+ * no hace falta el email), solo cuenta.
+ */
+export async function fetchPlayerEngagement(): Promise<PlayerEngagement> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [{ data: players, error }, { data: activity }] = await Promise.all([
+    supabase.from("players").select("user_id"),
+    supabase.from("account_activity").select("user_id, last_active_at").gte("last_active_at", since),
+  ]);
+  if (error) throw new Error(error.message);
+
+  const activeUserIds = new Set((activity ?? []).map((a) => a.user_id));
+  const activePlayersLast30d = (players ?? []).filter((p) => p.user_id && activeUserIds.has(p.user_id)).length;
+
+  return { totalPlayers: (players ?? []).length, activePlayersLast30d };
+}
+
 /**
  * Generaliza createAccountAndInvite (adminRepository.ts) a los 3 tipos de
  * cuenta, con los campos de contacto que antes no se pedían. Mismo patrón:

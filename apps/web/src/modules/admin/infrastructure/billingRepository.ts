@@ -165,6 +165,68 @@ export async function fetchSystemLogs(): Promise<BillingEventRow[]> {
   return fetchBillingEvents();
 }
 
+export interface MrrMovementEvent {
+  eventType: string;
+  fromPriceCents: number | null;
+  toPriceCents: number | null;
+  createdAt: string;
+  accountId: string | null;
+}
+
+/** Eventos que representan un cambio de plan real (no cualquier billing_event) — la base de New/Expansion/Contraction/Churned MRR. */
+export async function fetchMrrMovement(sinceIso: string): Promise<MrrMovementEvent[]> {
+  const supabase = await createClient();
+  const [{ data: events, error }, { data: plans }] = await Promise.all([
+    supabase
+      .from("billing_events")
+      .select("event_type, from_plan_id, to_plan_id, club_id, organizer_id, created_at")
+      .in("event_type", ["CHECKOUT_COMPLETED", "PLAN_CHANGED_MANUAL", "SUBSCRIPTION_DELETED"])
+      .gte("created_at", sinceIso),
+    supabase.from("plans").select("id, monthly_price_cents"),
+  ]);
+  if (error) throw new Error(error.message);
+
+  const priceById = new Map((plans ?? []).map((p) => [p.id, p.monthly_price_cents]));
+
+  return (events ?? []).map((e) => ({
+    eventType: e.event_type,
+    fromPriceCents: e.from_plan_id ? (priceById.get(e.from_plan_id) ?? null) : null,
+    toPriceCents: e.to_plan_id ? (priceById.get(e.to_plan_id) ?? null) : null,
+    createdAt: e.created_at,
+    accountId: e.club_id ?? e.organizer_id ?? null,
+  }));
+}
+
+export interface DunningOutcome {
+  accountId: string | null;
+  recovered: boolean;
+}
+
+/**
+ * Para cada cuenta que alguna vez tuvo un pago fallido, ¿terminó ACTIVE
+ * (se recuperó) o CANCELED/UNPAID (se perdió)? All-time, no acotado a un
+ * período — a esta escala de datos, acotarlo por fecha solo deja todo en 0.
+ */
+export async function fetchDunningOutcomes(): Promise<DunningOutcome[]> {
+  const supabase = await createClient();
+  const [{ data: failures, error: failuresError }, { data: billing, error: billingError }] = await Promise.all([
+    supabase.from("billing_events").select("club_id, organizer_id").eq("event_type", "INVOICE_PAYMENT_FAILED"),
+    supabase.from("account_billing").select("club_id, organizer_id, payment_status"),
+  ]);
+  if (failuresError) throw new Error(failuresError.message);
+  if (billingError) throw new Error(billingError.message);
+
+  const statusByAccountId = new Map(
+    (billing ?? []).map((b) => [(b.club_id ?? b.organizer_id) as string, b.payment_status])
+  );
+  const accountIds = new Set((failures ?? []).map((f) => (f.club_id ?? f.organizer_id) as string | null).filter(Boolean));
+
+  return Array.from(accountIds).map((accountId) => ({
+    accountId,
+    recovered: statusByAccountId.get(accountId as string) === "ACTIVE",
+  }));
+}
+
 export interface PaymentIssueRow {
   accountType: "CLUB" | "ORGANIZADOR";
   accountId: string;
