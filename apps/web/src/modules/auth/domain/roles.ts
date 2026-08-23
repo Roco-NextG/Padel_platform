@@ -56,8 +56,14 @@ export function roleRequiresOrganizer(role: AppRole): boolean {
   return role === "ORGANIZADOR";
 }
 
+/** Gate for the (club) route group — Club/Organizador panel, plus admin (can always inspect any surface). */
+export function belongsOnClubSurface(roles: RoleAssignment[]): boolean {
+  return isAdmin(roles) || roles.some((r) => r.role === "CLUB" || r.role === "ORGANIZADOR");
+}
+
 /** Where a logged-in user lands after signing in — expand as new role surfaces ship. */
 export function homePathForRoles(roles: RoleAssignment[]): string {
   if (isAdmin(roles)) return "/admin";
+  if (belongsOnClubSurface(roles)) return "/dashboard";
   return "/bienvenida";
 }
