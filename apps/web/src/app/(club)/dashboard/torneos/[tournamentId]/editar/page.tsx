@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTournament } from "@/modules/tournaments/application/getTournaments";
+import { fetchCategories } from "@/modules/tournaments/infrastructure/tournamentRepository";
 import { TournamentStatusBadge } from "@/modules/tournaments/ui/tournament-status-badge";
+import { CategoryGrid } from "@/modules/tournaments/ui/category-grid";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListChecks } from "@phosphor-icons/react/dist/ssr";
@@ -13,6 +15,8 @@ export default async function EditarTorneoPage({ params }: { params: Promise<{ t
   const tournament = await getTournament(tournamentId);
   if (!tournament) notFound();
 
+  const categories = await fetchCategories(tournamentId);
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-start justify-between gap-3">
@@ -23,18 +27,22 @@ export default async function EditarTorneoPage({ params }: { params: Promise<{ t
         <TournamentStatusBadge status={tournament.status} />
       </div>
 
-      <Card className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Torneo creado</span>
-        <p className="text-sm text-foreground">
-          Los datos básicos están guardados. El resto del asistente (patrocinadores, categorías, inscripción de
-          parejas y publicación) se conecta en la próxima etapa.
-        </p>
-      </Card>
+      <div className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-sm font-medium text-foreground">Categorías</h2>
+          <p className="text-xs text-muted-foreground">
+            Tocá una celda para activarla o desactivarla — nivel de juego × género.
+          </p>
+        </div>
+        <Card>
+          <CategoryGrid tournamentId={tournamentId} categories={categories} />
+        </Card>
+      </div>
 
       <EmptyState
         icon={ListChecks}
         title="Próximos pasos"
-        description="Patrocinadores → Categorías → Inscripciones → Publicar — cada paso se habilita a medida que se construye."
+        description="Patrocinadores → Inscripciones → Publicar — cada paso se habilita a medida que se construye."
       />
     </div>
   );

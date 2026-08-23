@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { CreateTournamentInput, Tournament } from "../domain/tournament";
+import type { TournamentCategory } from "../domain/category";
+import { categoryName } from "../domain/category";
 import type { ClubSurfaceAccount } from "@/modules/shell/infrastructure/accountRepository";
 
 /**
@@ -95,4 +97,43 @@ export async function createTournament(account: ClubSurfaceAccount, input: Creat
     .single();
   if (error) throw new Error(error.message);
   return data.id;
+}
+
+export async function fetchCategories(tournamentId: string): Promise<TournamentCategory[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournament_categories")
+    .select("id, tournament_id, name, level, gender_restriction")
+    .eq("tournament_id", tournamentId)
+    .order("level");
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((c) => ({
+    id: c.id,
+    tournamentId: c.tournament_id,
+    name: c.name,
+    level: c.level ?? "",
+    genderRestriction: c.gender_restriction ?? "MIXED",
+  }));
+}
+
+export async function addCategory(
+  tournamentId: string,
+  level: number,
+  gender: "MALE" | "FEMALE" | "MIXED"
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("tournament_categories").insert({
+    tournament_id: tournamentId,
+    name: categoryName(level, gender),
+    level: String(level),
+    gender_restriction: gender,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function removeCategory(categoryId: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("tournament_categories").delete().eq("id", categoryId);
+  if (error) throw new Error(error.message);
 }
