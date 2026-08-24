@@ -137,3 +137,13 @@ export async function removeCategory(categoryId: string): Promise<void> {
   const { error } = await supabase.from("tournament_categories").delete().eq("id", categoryId);
   if (error) throw new Error(error.message);
 }
+
+/** REGISTRATION_OPEN al publicar (no PUBLISHED a secas) — al publicar, las inscripciones ya construidas en el wizard quedan abiertas de una, no hace falta un paso más para eso. */
+export async function setTournamentPublished(tournamentId: string, published: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tournaments")
+    .update({ is_published: published, status: published ? "REGISTRATION_OPEN" : "DRAFT" })
+    .eq("id", tournamentId);
+  if (error) throw new Error(error.message);
+}
