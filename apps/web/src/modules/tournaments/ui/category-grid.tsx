@@ -20,6 +20,7 @@ export function CategoryGrid({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [pendingCell, setPendingCell] = useState<string | null>(null);
+  const [usesGroupStage, setUsesGroupStage] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const categoryByCell = new Map(categories.map((c) => [cellKey(Number(c.level), c.genderRestriction), c]));
@@ -30,7 +31,7 @@ export function CategoryGrid({
     setError(null);
     setPendingCell(key);
     startTransition(async () => {
-      const result = await toggleCategoryAction(tournamentId, existing?.id ?? null, level, gender);
+      const result = await toggleCategoryAction(tournamentId, existing?.id ?? null, level, gender, usesGroupStage);
       setPendingCell(null);
       if (result.error) setError(result.error);
     });
@@ -38,6 +39,15 @@ export function CategoryGrid({
 
   return (
     <div className="flex flex-col gap-3">
+      <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={usesGroupStage}
+          onChange={(e) => setUsesGroupStage(e.target.checked)}
+          className="size-3.5 accent-accent"
+        />
+        Las categorías nuevas empiezan con fase de grupos
+      </label>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[420px] border-separate border-spacing-1.5">
           <thead>

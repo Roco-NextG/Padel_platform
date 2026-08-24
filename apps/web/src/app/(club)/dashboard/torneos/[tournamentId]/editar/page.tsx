@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTournament } from "@/modules/tournaments/application/getTournaments";
 import { fetchCategories } from "@/modules/tournaments/infrastructure/tournamentRepository";
@@ -30,7 +31,12 @@ export default async function EditarTorneoPage({ params }: { params: Promise<{ t
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{tournament.name}</h1>
-          <p className="text-sm text-muted-foreground">{tournament.clubName}</p>
+          <p className="text-sm text-muted-foreground">
+            {tournament.clubName} ·{" "}
+            <Link href={`/dashboard/torneos/${tournamentId}/cuadro`} className="text-accent-text hover:underline">
+              Ver cuadro
+            </Link>
+          </p>
         </div>
         <TournamentStatusBadge status={tournament.status} />
       </div>

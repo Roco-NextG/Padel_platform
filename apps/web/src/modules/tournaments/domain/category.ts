@@ -6,6 +6,7 @@ export interface TournamentCategory {
   name: string;
   level: string;
   genderRestriction: GenderType;
+  usesGroupStage: boolean;
 }
 
 export const CATEGORY_LEVELS = [1, 2, 3, 4, 5, 6, 7] as const;
