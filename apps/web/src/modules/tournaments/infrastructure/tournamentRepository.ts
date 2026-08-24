@@ -77,26 +77,39 @@ export async function fetchTournamentById(tournamentId: string): Promise<Tournam
  * account.role decide organizer_id: null si lo crea el propio Club, la
  * propia si lo crea un Organizador (que además debe indicar hostClubId,
  * validado en la capa de aplicación antes de llegar acá).
+ *
+ * El id se genera acá en vez de pedirlo de vuelta con .select() a
+ * propósito: tournaments_select (0010_tournament_rls.sql) llama
+ * is_tournament_manager(id), que vuelve a consultar la propia tabla
+ * tournaments — cuando PostgREST hace INSERT ... RETURNING (lo que dispara
+ * .select() encadenado), esa lectura de la fila recién insertada dentro del
+ * mismo statement evalúa a "no visible todavía" y el insert entero falla
+ * con "new row violates row-level security policy", aunque la fila sea
+ * 100% válida (confirmado en vivo: el mismo insert sin .select() funciona
+ * siempre, y is_tournament_manager(id) da true un instante después, ya
+ * confirmado). Ninguna otra tabla de este proyecto tiene este problema
+ * porque tournaments es la única cuyo select policy necesita re-consultarse
+ * a sí misma — el resto de los self-checks pasan por tablas ya existentes
+ * (tournament_categories, teams, etc.), nunca por la tabla que se está
+ * insertando.
  */
 export async function createTournament(account: ClubSurfaceAccount, input: CreateTournamentInput): Promise<string> {
   const supabase = await createClient();
   const clubId = account.role === "Club" ? account.clubId! : input.hostClubId!;
+  const id = crypto.randomUUID();
 
-  const { data, error } = await supabase
-    .from("tournaments")
-    .insert({
-      name: input.name,
-      description: input.description || null,
-      club_id: clubId,
-      organizer_id: account.role === "Organizador" ? account.organizerId : null,
-      start_date: input.startDate || null,
-      end_date: input.endDate || null,
-      status: "DRAFT",
-    })
-    .select("id")
-    .single();
+  const { error } = await supabase.from("tournaments").insert({
+    id,
+    name: input.name,
+    description: input.description || null,
+    club_id: clubId,
+    organizer_id: account.role === "Organizador" ? account.organizerId : null,
+    start_date: input.startDate || null,
+    end_date: input.endDate || null,
+    status: "DRAFT",
+  });
   if (error) throw new Error(error.message);
-  return data.id;
+  return id;
 }
 
 export async function fetchCategories(tournamentId: string): Promise<TournamentCategory[]> {
