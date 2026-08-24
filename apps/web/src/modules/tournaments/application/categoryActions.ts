@@ -1,27 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { addCategory, fetchTournamentById, removeCategory } from "../infrastructure/tournamentRepository";
-import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
-import { isClub, isOrganizer } from "@/modules/auth/domain/roles";
+import { addCategory, removeCategory } from "../infrastructure/tournamentRepository";
+import { requireTournamentManager } from "./authGuard";
 
 export interface SimpleActionState {
   error: string | null;
-}
-
-async function requireTournamentManager(tournamentId: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const context = await getCurrentUserContext();
-  if (!context) return { ok: false, error: "Tu sesión expiró. Vuelve a iniciar sesión." };
-
-  const tournament = await fetchTournamentById(tournamentId);
-  if (!tournament) return { ok: false, error: "El torneo no existe." };
-
-  const manages = tournament.organizerId
-    ? isOrganizer(context.roles, tournament.organizerId)
-    : isClub(context.roles, tournament.clubId);
-  if (!manages) return { ok: false, error: "No administras este torneo." };
-
-  return { ok: true };
 }
 
 export async function toggleCategoryAction(

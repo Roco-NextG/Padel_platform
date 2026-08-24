@@ -2,11 +2,15 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTournament } from "@/modules/tournaments/application/getTournaments";
 import { fetchCategories } from "@/modules/tournaments/infrastructure/tournamentRepository";
+import { fetchTeamsForCategory } from "@/modules/tournaments/infrastructure/enrollmentRepository";
+import { fetchSponsors } from "@/modules/tournaments/infrastructure/sponsorRepository";
 import { TournamentStatusBadge } from "@/modules/tournaments/ui/tournament-status-badge";
 import { CategoryGrid } from "@/modules/tournaments/ui/category-grid";
+import { EnrollmentPanel } from "@/modules/tournaments/ui/enrollment-panel";
+import { SponsorsManager } from "@/modules/tournaments/ui/sponsors-manager";
+import { PublishPanel } from "@/modules/tournaments/ui/publish-panel";
+import { categoryName } from "@/modules/tournaments/domain/category";
 import { Card } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ListChecks } from "@phosphor-icons/react/dist/ssr";
 
 export const metadata: Metadata = { title: "Editar torneo — Padel Platform" };
 
@@ -16,6 +20,10 @@ export default async function EditarTorneoPage({ params }: { params: Promise<{ t
   if (!tournament) notFound();
 
   const categories = await fetchCategories(tournamentId);
+  const [categoriesWithTeams, sponsors] = await Promise.all([
+    Promise.all(categories.map(async (c) => ({ category: c, teams: await fetchTeamsForCategory(c.id) }))),
+    fetchSponsors(tournamentId),
+  ]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -39,11 +47,45 @@ export default async function EditarTorneoPage({ params }: { params: Promise<{ t
         </Card>
       </div>
 
-      <EmptyState
-        icon={ListChecks}
-        title="Próximos pasos"
-        description="Patrocinadores → Inscripciones → Publicar — cada paso se habilita a medida que se construye."
-      />
+      {categoriesWithTeams.length > 0 && (
+        <div className="flex flex-col gap-4">
+          <div>
+            <h2 className="text-sm font-medium text-foreground">Inscripciones</h2>
+            <p className="text-xs text-muted-foreground">Buscá jugadores existentes o creá uno nuevo para armar cada pareja.</p>
+          </div>
+          {categoriesWithTeams.map(({ category, teams }) => (
+            <Card key={category.id} className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-foreground">
+                {categoryName(Number(category.level), category.genderRestriction as "MALE" | "FEMALE" | "MIXED")}
+              </span>
+              <EnrollmentPanel
+                tournamentId={tournamentId}
+                categoryId={category.id}
+                categoryGender={category.genderRestriction as "MALE" | "FEMALE" | "MIXED"}
+                teams={teams}
+              />
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-sm font-medium text-foreground">Patrocinadores</h2>
+          <p className="text-xs text-muted-foreground">Aparecen en el torneo público una vez que lo publiques.</p>
+        </div>
+        <Card>
+          <SponsorsManager tournamentId={tournamentId} sponsors={sponsors} />
+        </Card>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-sm font-medium text-foreground">Publicar</h2>
+          <p className="text-xs text-muted-foreground">Última etapa del asistente — el torneo queda listo para jugarse.</p>
+        </div>
+        <PublishPanel tournamentId={tournamentId} isPublished={tournament.isPublished} />
+      </div>
     </div>
   );
 }
