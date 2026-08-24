@@ -30,6 +30,7 @@ function InviteRow({ invite }: { invite: PendingInviteRow }) {
   const canRevoke = invite.status === "PENDING";
 
   function revoke() {
+    if (!window.confirm(`¿Cancelar la invitación de "${invite.email}"? Se borra la cuenta sin confirmar — vas a poder invitar a este email de nuevo.`)) return;
     setError(null);
     startTransition(async () => {
       const result = await revokeInviteAction(invite.id);
@@ -56,7 +57,7 @@ function InviteRow({ invite }: { invite: PendingInviteRow }) {
       </div>
       {canRevoke && (
         <Button type="button" variant="destructive" size="sm" loading={isPending} onClick={revoke}>
-          Revocar
+          Cancelar invitación
         </Button>
       )}
     </Card>
