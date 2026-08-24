@@ -12,7 +12,8 @@ export async function toggleCategoryAction(
   tournamentId: string,
   existingCategoryId: string | null,
   level: number,
-  gender: "MALE" | "FEMALE" | "MIXED"
+  gender: "MALE" | "FEMALE" | "MIXED",
+  usesGroupStage: boolean
 ): Promise<SimpleActionState> {
   const auth = await requireTournamentManager(tournamentId);
   if (!auth.ok) return { error: auth.error };
@@ -21,7 +22,7 @@ export async function toggleCategoryAction(
     if (existingCategoryId) {
       await removeCategory(existingCategoryId);
     } else {
-      await addCategory(tournamentId, level, gender);
+      await addCategory(tournamentId, level, gender, usesGroupStage);
     }
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo actualizar la categoría." };

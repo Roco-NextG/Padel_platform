@@ -317,10 +317,13 @@ export interface Database {
           team_b_id?: string | null;
           scheduled_start?: string | null;
           scheduled_end?: string | null;
+          actual_start?: string | null;
+          actual_end?: string | null;
           status?: MatchStatus;
           winner_team_id?: string | null;
           match_type?: DbMatchType;
           is_paused?: boolean;
+          created_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["matches"]["Insert"]>;
       };
@@ -550,7 +553,7 @@ export interface Database {
           p_team_a_id: string;
           p_team_b_id: string;
           p_match_type: DbMatchType;
-          p_completed_match_id: string;
+          p_completed_match_id: string | null;
         };
         Returns: Database["public"]["Tables"]["matches"]["Row"];
       };

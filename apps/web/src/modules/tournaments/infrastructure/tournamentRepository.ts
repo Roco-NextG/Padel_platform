@@ -103,7 +103,7 @@ export async function fetchCategories(tournamentId: string): Promise<TournamentC
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tournament_categories")
-    .select("id, tournament_id, name, level, gender_restriction")
+    .select("id, tournament_id, name, level, gender_restriction, uses_group_stage")
     .eq("tournament_id", tournamentId)
     .order("level");
   if (error) throw new Error(error.message);
@@ -114,13 +114,15 @@ export async function fetchCategories(tournamentId: string): Promise<TournamentC
     name: c.name,
     level: c.level ?? "",
     genderRestriction: c.gender_restriction ?? "MIXED",
+    usesGroupStage: c.uses_group_stage,
   }));
 }
 
 export async function addCategory(
   tournamentId: string,
   level: number,
-  gender: "MALE" | "FEMALE" | "MIXED"
+  gender: "MALE" | "FEMALE" | "MIXED",
+  usesGroupStage: boolean
 ): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("tournament_categories").insert({
@@ -128,6 +130,7 @@ export async function addCategory(
     name: categoryName(level, gender),
     level: String(level),
     gender_restriction: gender,
+    uses_group_stage: usesGroupStage,
   });
   if (error) throw new Error(error.message);
 }
