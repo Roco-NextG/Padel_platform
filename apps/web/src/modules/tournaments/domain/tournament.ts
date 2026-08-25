@@ -15,6 +15,7 @@ export interface Tournament {
   startDate: string | null;
   endDate: string | null;
   categoryCount: number;
+  teamCount: number;
   createdAt: string;
 }
 
@@ -33,6 +34,28 @@ export function tournamentStatusLabel(status: TournamentStatus): string {
   return STATUS_LABELS[status];
 }
 
+/**
+ * El badge de .torneo-card (padel-platform.html) usa solo 3 buckets, no los
+ * 8 valores de TournamentStatus — "Configurado" no tiene un status propio
+ * en el modelo real, así que se deriva: sin publicar pero con al menos una
+ * categoría ya armada. is_published=true cubre PUBLISHED, los REGISTRATION_
+ * y IN_PROGRESS/FINISHED por igual — el detalle fino de esos vive en
+ * TournamentStatusBadge (usado en las páginas de detalle, no en la card).
+ */
+export type CardStatus = "borrador" | "configurado" | "publicado";
+
+export function cardStatus(tournament: Pick<Tournament, "isPublished" | "categoryCount">): CardStatus {
+  if (tournament.isPublished) return "publicado";
+  if (tournament.categoryCount > 0) return "configurado";
+  return "borrador";
+}
+
+export const CARD_STATUS_LABELS: Record<CardStatus, string> = {
+  borrador: "Borrador",
+  configurado: "Configurado",
+  publicado: "Publicado",
+};
+
 export const createTournamentSchema = z
   .object({
     name: z.string().trim().min(2, "Ingresa el nombre del torneo."),
@@ -47,3 +70,29 @@ export const createTournamentSchema = z
   });
 
 export type CreateTournamentInput = z.infer<typeof createTournamentSchema>;
+
+/** club_id/organizer_id no se editan después de creado — solo los datos propios del torneo. */
+export const updateTournamentSchema = z
+  .object({
+    name: z.string().trim().min(2, "Ingresa el nombre del torneo."),
+    description: z.string().trim().optional(),
+    startDate: z.string().trim().optional(),
+    endDate: z.string().trim().optional(),
+  })
+  .refine((data) => !data.startDate || !data.endDate || data.startDate <= data.endDate, {
+    message: "La fecha de fin no puede ser anterior a la de inicio.",
+    path: ["endDate"],
+  });
+
+export type UpdateTournamentInput = z.infer<typeof updateTournamentSchema>;
+
+export const WIZARD_STEPS = ["datos", "patrocinadores", "categorias", "inscripciones", "publicar"] as const;
+export type WizardStepId = (typeof WIZARD_STEPS)[number];
+
+export const WIZARD_STEP_LABELS: Record<WizardStepId, string> = {
+  datos: "Datos",
+  patrocinadores: "Patrocinadores",
+  categorias: "Categorías",
+  inscripciones: "Inscripciones",
+  publicar: "Publicar",
+};

@@ -1,43 +1,58 @@
+import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { GroupStandingsView } from "../infrastructure/bracketRepository";
+
+/** Anatomía calcada de .group-card/.g-row (padel-platform.html): top 2 de cada grupo clasifican al cuadro, mismo criterio que balancedSeeding usa para sembrar. */
+const QUALIFYING_SLOTS = 2;
 
 export function GroupStandings({ groups }: { groups: GroupStandingsView[] }) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       {groups.map((g) => (
-        <div key={g.groupId} className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-surface-secondary text-xs text-muted-foreground">
-                <th className="px-3 py-2 text-left font-medium">{g.groupName}</th>
-                <th className="px-2 py-2 text-center font-medium">PJ</th>
-                <th className="px-2 py-2 text-center font-medium">PG</th>
-                <th className="px-2 py-2 text-center font-medium">Sets</th>
-                <th className="px-2 py-2 text-center font-medium">Games</th>
-              </tr>
-            </thead>
-            <tbody>
-              {g.standings.map((s, i) => (
-                <tr key={s.teamId} className="border-b border-border last:border-0">
-                  <td className="flex items-center gap-1.5 px-3 py-2">
-                    <span className="text-xs text-muted-foreground">{i + 1}</span>
+        <div key={g.groupId} className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+          <h3 className="text-sm font-semibold text-foreground">{g.groupName}</h3>
+          <div className="flex flex-col">
+            {g.standings.map((s, i) => {
+              const qualifies = i < QUALIFYING_SLOTS;
+              return (
+                <div
+                  key={s.teamId}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-2 py-2",
+                    qualifies && "bg-accent-muted"
+                  )}
+                >
+                  <span className={cn("w-4 text-xs font-medium", qualifies ? "text-accent-text" : "text-muted-foreground")}>
+                    {i + 1}
+                  </span>
+                  <Avatar
+                    name={s.teamLabel}
+                    className={cn("size-7 text-[10px]", qualifies && "bg-accent text-accent-foreground")}
+                  />
+                  <span className={cn("flex-1 truncate text-xs font-medium", qualifies ? "text-accent-text" : "text-foreground")}>
                     {s.teamLabel}
-                    {s.requiresManualResolution && (
-                      <Badge tone="warning" className="ml-1">
-                        Empate
-                      </Badge>
-                    )}
-                  </td>
-                  <td className="px-2 py-2 text-center text-muted-foreground">{s.matchesPlayed}</td>
-                  <td className="px-2 py-2 text-center text-muted-foreground">{s.matchesWon}</td>
-                  <td className="px-2 py-2 text-center text-muted-foreground">
-                    {s.setsWon}-{s.setsLost}
-                  </td>
-                  <td className="px-2 py-2 text-center text-muted-foreground">{s.gameDiff >= 0 ? `+${s.gameDiff}` : s.gameDiff}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </span>
+                  <span className="w-12 text-right text-[11px] text-muted-foreground">
+                    {s.matchesWon}/{s.matchesPlayed}
+                  </span>
+                  <span className="w-10 text-right text-[11px] text-muted-foreground">
+                    {s.gameDiff >= 0 ? `+${s.gameDiff}` : s.gameDiff}
+                  </span>
+                  {qualifies && (
+                    <Badge tone="accent" className="shrink-0">
+                      Clasifica
+                    </Badge>
+                  )}
+                  {s.requiresManualResolution && (
+                    <Badge tone="warning" className="shrink-0">
+                      Empate
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       ))}
     </div>

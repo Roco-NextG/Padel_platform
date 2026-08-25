@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { CreateTournamentInput, Tournament } from "../domain/tournament";
+import type { CreateTournamentInput, Tournament, UpdateTournamentInput } from "../domain/tournament";
 import type { TournamentCategory } from "../domain/category";
 import { categoryName } from "../domain/category";
 import type { ClubSurfaceAccount } from "@/modules/shell/infrastructure/accountRepository";
@@ -27,8 +27,22 @@ export async function fetchMyTournaments(account: ClubSurfaceAccount): Promise<T
     ? await supabase.from("tournament_categories").select("id, tournament_id").in("tournament_id", tournamentIds)
     : { data: [] };
   const categoryCountByTournament = new Map<string, number>();
+  const tournamentIdByCategoryId = new Map<string, string>();
   for (const c of categories ?? []) {
     categoryCountByTournament.set(c.tournament_id, (categoryCountByTournament.get(c.tournament_id) ?? 0) + 1);
+    tournamentIdByCategoryId.set(c.id, c.tournament_id);
+  }
+
+  const categoryIds = (categories ?? []).map((c) => c.id);
+  const { data: teams } = categoryIds.length
+    ? await supabase.from("teams").select("id, tournament_category_id").in("tournament_category_id", categoryIds)
+    : { data: [] };
+  const teamCountByTournament = new Map<string, number>();
+  for (const t of teams ?? []) {
+    if (!t.tournament_category_id) continue;
+    const tournamentId = tournamentIdByCategoryId.get(t.tournament_category_id);
+    if (!tournamentId) continue;
+    teamCountByTournament.set(tournamentId, (teamCountByTournament.get(tournamentId) ?? 0) + 1);
   }
 
   return (data ?? []).map((t) => ({
@@ -43,6 +57,7 @@ export async function fetchMyTournaments(account: ClubSurfaceAccount): Promise<T
     startDate: t.start_date,
     endDate: t.end_date,
     categoryCount: categoryCountByTournament.get(t.id) ?? 0,
+    teamCount: teamCountByTournament.get(t.id) ?? 0,
     createdAt: t.created_at,
   }));
 }
@@ -69,6 +84,7 @@ export async function fetchTournamentById(tournamentId: string): Promise<Tournam
     startDate: data.start_date,
     endDate: data.end_date,
     categoryCount: 0,
+    teamCount: 0,
     createdAt: data.created_at,
   };
 }
@@ -110,6 +126,20 @@ export async function createTournament(account: ClubSurfaceAccount, input: Creat
   });
   if (error) throw new Error(error.message);
   return id;
+}
+
+export async function updateTournament(tournamentId: string, input: UpdateTournamentInput): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tournaments")
+    .update({
+      name: input.name,
+      description: input.description || null,
+      start_date: input.startDate || null,
+      end_date: input.endDate || null,
+    })
+    .eq("id", tournamentId);
+  if (error) throw new Error(error.message);
 }
 
 export async function fetchCategories(tournamentId: string): Promise<TournamentCategory[]> {
