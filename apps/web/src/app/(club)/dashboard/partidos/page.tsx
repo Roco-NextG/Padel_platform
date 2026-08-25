@@ -43,10 +43,12 @@ export default async function PartidosPage({
     );
   }
 
+  const torneoParam = torneo ? `&torneo=${torneo}` : "";
+
   const viewSwitch = (
     <div className="flex gap-1 rounded-full border border-border-strong bg-surface p-1">
       <Link
-        href="/dashboard/partidos?vista=live"
+        href={`/dashboard/partidos?vista=live${torneoParam}`}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
           vista !== "plan" ? "bg-accent-muted text-accent-text" : "text-muted-foreground hover:bg-surface-secondary"
         }`}
@@ -55,7 +57,7 @@ export default async function PartidosPage({
         En vivo
       </Link>
       <Link
-        href="/dashboard/partidos?vista=plan"
+        href={`/dashboard/partidos?vista=plan${torneoParam}`}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
           vista === "plan" ? "bg-accent-muted text-accent-text" : "text-muted-foreground hover:bg-surface-secondary"
         }`}
