@@ -31,6 +31,7 @@ export interface MatchListItem {
   courtName: string | null;
   status: MatchStatus;
   scheduledStart: string | null;
+  scheduledEnd: string | null;
   teamA: MatchTeamView | null;
   teamB: MatchTeamView | null;
   winnerTeamId: string | null;
