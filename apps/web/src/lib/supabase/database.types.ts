@@ -514,7 +514,26 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["account_activity"]["Insert"]>;
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      rating_history: {
+        Relationships: [];
+        Row: {
+          id: string;
+          player_id: string;
+          match_id: string;
+          partner_id: string | null;
+          old_rating: number;
+          new_rating: number;
+          old_rd: number;
+          new_rd: number;
+          reason: RatingReason;
+          algorithm_version: string;
+          superseded: boolean;
+          created_at: string;
+          created_by: string | null;
+        };
+      };
+    };
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean };
       is_club: { Args: { target_club_id: string }; Returns: boolean };
@@ -568,6 +587,20 @@ export interface Database {
       record_rating_events: {
         Args: { p_events: unknown };
         Returns: Database["public"]["Tables"]["rating_events"]["Row"][];
+      };
+      fetch_visible_players: {
+        Args: Record<string, never>;
+        Returns: {
+          player_id: string;
+          first_name: string;
+          last_name: string;
+          phone: string | null;
+          email: string | null;
+          current_rating: number | null;
+          current_rating_deviation: number | null;
+          category: number | null;
+          gender: GenderType | null;
+        }[];
       };
     };
     Enums: {

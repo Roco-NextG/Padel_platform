@@ -1,21 +1,19 @@
 import type { Metadata } from "next";
-import { UsersThree } from "@phosphor-icons/react/dist/ssr";
-import { EmptyState } from "@/components/ui/empty-state";
+import { fetchPlayerDirectory, fetchRanking } from "@/modules/players/infrastructure/playerRepository";
+import { PlayersView } from "@/modules/players/ui/players-view";
 
 export const metadata: Metadata = { title: "Jugadores — Padel Platform" };
 
-export default function JugadoresPage() {
+export default async function JugadoresPage() {
+  const [ranking, directory] = await Promise.all([fetchRanking(), fetchPlayerDirectory()]);
+
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Jugadores</h1>
-        <p className="text-sm text-muted-foreground">Ranking y roster.</p>
+        <p className="text-sm text-muted-foreground">Ranking y roster de tu base de jugadores.</p>
       </div>
-      <EmptyState
-        icon={UsersThree}
-        title="En construcción"
-        description="El ranking y el roster de jugadores llegan en la próxima etapa."
-      />
+      <PlayersView ranking={ranking} directory={directory} />
     </div>
   );
 }
