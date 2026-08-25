@@ -15,6 +15,7 @@ export interface Tournament {
   startDate: string | null;
   endDate: string | null;
   categoryCount: number;
+  teamCount: number;
   createdAt: string;
 }
 
@@ -32,6 +33,28 @@ const STATUS_LABELS: Record<TournamentStatus, string> = {
 export function tournamentStatusLabel(status: TournamentStatus): string {
   return STATUS_LABELS[status];
 }
+
+/**
+ * El badge de .torneo-card (padel-platform.html) usa solo 3 buckets, no los
+ * 8 valores de TournamentStatus — "Configurado" no tiene un status propio
+ * en el modelo real, así que se deriva: sin publicar pero con al menos una
+ * categoría ya armada. is_published=true cubre PUBLISHED, los REGISTRATION_
+ * y IN_PROGRESS/FINISHED por igual — el detalle fino de esos vive en
+ * TournamentStatusBadge (usado en las páginas de detalle, no en la card).
+ */
+export type CardStatus = "borrador" | "configurado" | "publicado";
+
+export function cardStatus(tournament: Pick<Tournament, "isPublished" | "categoryCount">): CardStatus {
+  if (tournament.isPublished) return "publicado";
+  if (tournament.categoryCount > 0) return "configurado";
+  return "borrador";
+}
+
+export const CARD_STATUS_LABELS: Record<CardStatus, string> = {
+  borrador: "Borrador",
+  configurado: "Configurado",
+  publicado: "Publicado",
+};
 
 export const createTournamentSchema = z
   .object({
