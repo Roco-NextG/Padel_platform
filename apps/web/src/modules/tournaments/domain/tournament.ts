@@ -70,3 +70,29 @@ export const createTournamentSchema = z
   });
 
 export type CreateTournamentInput = z.infer<typeof createTournamentSchema>;
+
+/** club_id/organizer_id no se editan después de creado — solo los datos propios del torneo. */
+export const updateTournamentSchema = z
+  .object({
+    name: z.string().trim().min(2, "Ingresa el nombre del torneo."),
+    description: z.string().trim().optional(),
+    startDate: z.string().trim().optional(),
+    endDate: z.string().trim().optional(),
+  })
+  .refine((data) => !data.startDate || !data.endDate || data.startDate <= data.endDate, {
+    message: "La fecha de fin no puede ser anterior a la de inicio.",
+    path: ["endDate"],
+  });
+
+export type UpdateTournamentInput = z.infer<typeof updateTournamentSchema>;
+
+export const WIZARD_STEPS = ["datos", "patrocinadores", "categorias", "inscripciones", "publicar"] as const;
+export type WizardStepId = (typeof WIZARD_STEPS)[number];
+
+export const WIZARD_STEP_LABELS: Record<WizardStepId, string> = {
+  datos: "Datos",
+  patrocinadores: "Patrocinadores",
+  categorias: "Categorías",
+  inscripciones: "Inscripciones",
+  publicar: "Publicar",
+};

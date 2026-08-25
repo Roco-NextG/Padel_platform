@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { CreateTournamentInput, Tournament } from "../domain/tournament";
+import type { CreateTournamentInput, Tournament, UpdateTournamentInput } from "../domain/tournament";
 import type { TournamentCategory } from "../domain/category";
 import { categoryName } from "../domain/category";
 import type { ClubSurfaceAccount } from "@/modules/shell/infrastructure/accountRepository";
@@ -126,6 +126,20 @@ export async function createTournament(account: ClubSurfaceAccount, input: Creat
   });
   if (error) throw new Error(error.message);
   return id;
+}
+
+export async function updateTournament(tournamentId: string, input: UpdateTournamentInput): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tournaments")
+    .update({
+      name: input.name,
+      description: input.description || null,
+      start_date: input.startDate || null,
+      end_date: input.endDate || null,
+    })
+    .eq("id", tournamentId);
+  if (error) throw new Error(error.message);
 }
 
 export async function fetchCategories(tournamentId: string): Promise<TournamentCategory[]> {
