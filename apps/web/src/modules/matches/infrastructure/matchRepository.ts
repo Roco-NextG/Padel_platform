@@ -91,6 +91,56 @@ function mapMatchRows(rows: any[] | null): MatchListItem[] {
   }));
 }
 
+export interface RecentResult {
+  id: string;
+  winnerLabel: string;
+  scoreLabel: string;
+}
+
+/** "Últimos resultados" del dashboard — partidos CONFIRMED más recientes, cross-tournament. */
+export async function fetchRecentResults(account: ClubSurfaceAccount, limit: number): Promise<RecentResult[]> {
+  const supabase = await createClient();
+  let tournamentQuery = supabase.from("tournaments").select("id");
+  tournamentQuery =
+    account.role === "Club"
+      ? tournamentQuery.eq("club_id", account.clubId!).is("organizer_id", null)
+      : tournamentQuery.eq("organizer_id", account.organizerId!);
+  const { data: tournaments } = await tournamentQuery;
+  const tournamentIds = (tournaments ?? []).map((t) => t.id);
+  if (tournamentIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("matches")
+    .select(
+      `id, winner_team_id, team_a_id, team_b_id,
+       set_scores(set_number, team_a_games, team_b_games),
+       team_a:teams!matches_team_a_id_fkey(id, team_members(players(first_name, last_name))),
+       team_b:teams!matches_team_b_id_fkey(id, team_members(players(first_name, last_name)))`
+    )
+    .in("tournament_id", tournamentIds)
+    .eq("status", "CONFIRMED")
+    .not("team_a_id", "is", null)
+    .not("team_b_id", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((m) => {
+    const winnerTeam = m.winner_team_id === m.team_a_id ? m.team_a : m.team_b;
+    const members = (winnerTeam?.team_members ?? []) as { players: { first_name: string; last_name: string } | null }[];
+    const winnerLabel = members
+      .filter((mm) => mm.players)
+      .map((mm) => mm.players!.first_name)
+      .join(" / ");
+    const sets = [...(m.set_scores ?? [])].sort(
+      (a: { set_number: number }, b: { set_number: number }) => a.set_number - b.set_number
+    );
+    const scoreLabel = sets.map((s: { team_a_games: number; team_b_games: number }) => `${s.team_a_games}-${s.team_b_games}`).join(", ");
+    return { id: m.id as string, winnerLabel: winnerLabel || "?", scoreLabel };
+  });
+}
+
 export interface MatchRatingContext {
   tournamentId: string;
   categoryId: string | null;
