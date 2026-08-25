@@ -166,16 +166,21 @@ export async function addCategory(
   level: number,
   gender: "MALE" | "FEMALE" | "MIXED",
   usesGroupStage: boolean
-): Promise<void> {
+): Promise<string> {
   const supabase = await createClient();
-  const { error } = await supabase.from("tournament_categories").insert({
-    tournament_id: tournamentId,
-    name: categoryName(level, gender),
-    level: String(level),
-    gender_restriction: gender,
-    uses_group_stage: usesGroupStage,
-  });
+  const { data, error } = await supabase
+    .from("tournament_categories")
+    .insert({
+      tournament_id: tournamentId,
+      name: categoryName(level, gender),
+      level: String(level),
+      gender_restriction: gender,
+      uses_group_stage: usesGroupStage,
+    })
+    .select("id")
+    .single();
   if (error) throw new Error(error.message);
+  return data.id;
 }
 
 export async function removeCategory(categoryId: string): Promise<void> {
