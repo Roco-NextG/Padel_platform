@@ -13,11 +13,12 @@ function cellKey(level: number, gender: string): string {
 
 export function CategoryGrid({
   tournamentId,
-  categories,
+  categories: initialCategories,
 }: {
   tournamentId: string;
   categories: TournamentCategory[];
 }) {
+  const [categories, setCategories] = useState(initialCategories);
   const [error, setError] = useState<string | null>(null);
   const [pendingCell, setPendingCell] = useState<string | null>(null);
   const [usesGroupStage, setUsesGroupStage] = useState(false);
@@ -33,7 +34,18 @@ export function CategoryGrid({
     startTransition(async () => {
       const result = await toggleCategoryAction(tournamentId, existing?.id ?? null, level, gender, usesGroupStage);
       setPendingCell(null);
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      if (existing) {
+        setCategories((prev) => prev.filter((c) => c.id !== existing.id));
+      } else if (result.createdId) {
+        setCategories((prev) => [
+          ...prev,
+          { id: result.createdId!, tournamentId, name: "", level: String(level), genderRestriction: gender, usesGroupStage },
+        ]);
+      }
     });
   }
 
