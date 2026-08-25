@@ -19,7 +19,7 @@ function toTeamView(teamId: string | null, members: RawTeamMember[] | null | und
 }
 
 const MATCH_LIST_SELECT = `
-  id, tournament_id, phase_id, group_id, court_id, status, scheduled_start, scheduled_end,
+  id, tournament_id, phase_id, group_id, court_id, status, is_paused, scheduled_start, scheduled_end, actual_start,
   team_a_id, team_b_id, winner_team_id,
   tournaments(name, scoring_config),
   tournament_phases(type, category_id, tournament_categories(name)),
@@ -46,7 +46,7 @@ export async function fetchManagedMatches(account: ClubSurfaceAccount): Promise<
     .from("matches")
     .select(MATCH_LIST_SELECT)
     .in("tournament_id", tournamentIds)
-    .in("status", ["SCHEDULED", "IN_PROGRESS", "PENDING_CONFIRMATION", "DISPUTED"])
+    .in("status", ["SCHEDULED", "IN_PROGRESS", "PENDING_CONFIRMATION", "DISPUTED", "CANCELLED"])
     .not("team_a_id", "is", null)
     .not("team_b_id", "is", null)
     .order("scheduled_start", { ascending: true, nullsFirst: false })
@@ -98,8 +98,10 @@ function mapMatchRows(rows: any[] | null): MatchListItem[] {
     courtId: m.court_id,
     courtName: m.courts?.name ?? null,
     status: m.status,
+    isPaused: m.is_paused,
     scheduledStart: m.scheduled_start,
     scheduledEnd: m.scheduled_end,
+    actualStart: m.actual_start,
     teamA: toTeamView(m.team_a_id, m.team_a?.team_members),
     teamB: toTeamView(m.team_b_id, m.team_b?.team_members),
     winnerTeamId: m.winner_team_id,
@@ -229,6 +231,18 @@ export async function setMatchCourt(matchId: string, courtId: string | null): Pr
 export async function setMatchInProgress(matchId: string): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("matches").update({ status: "IN_PROGRESS", actual_start: new Date().toISOString() }).eq("id", matchId);
+  if (error) throw new Error(error.message);
+}
+
+export async function setMatchPaused(matchId: string, paused: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("matches").update({ is_paused: paused }).eq("id", matchId);
+  if (error) throw new Error(error.message);
+}
+
+export async function cancelMatch(matchId: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("matches").update({ status: "CANCELLED", is_paused: false }).eq("id", matchId);
   if (error) throw new Error(error.message);
 }
 

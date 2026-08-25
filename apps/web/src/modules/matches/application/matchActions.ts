@@ -4,12 +4,14 @@ import { revalidatePath } from "next/cache";
 import { validateMatchResult, type SetScoreInput, type TeamSide } from "@padel-platform/match-engine";
 import { applyMatchResult, RATING_CONFIG, type MatchTypeForRating, type RatingMatchInput } from "@padel-platform/rating-engine";
 import {
+  cancelMatch,
   clearMatchSchedule,
   fetchMatchRatingContext,
   findScheduleConflict,
   recordRatingEvents,
   setMatchCourt,
   setMatchInProgress,
+  setMatchPaused,
   setMatchSchedule,
   submitResult,
 } from "../infrastructure/matchRepository";
@@ -147,6 +149,48 @@ export async function startMatchAction(tournamentId: string, matchId: string): P
     await setMatchInProgress(matchId);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo iniciar el partido." };
+  }
+
+  revalidatePath("/dashboard/partidos");
+  return { error: null };
+}
+
+export async function pauseMatchAction(tournamentId: string, matchId: string): Promise<SimpleActionState> {
+  const auth = await requireTournamentManager(tournamentId);
+  if (!auth.ok) return { error: auth.error };
+
+  try {
+    await setMatchPaused(matchId, true);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo pausar el partido." };
+  }
+
+  revalidatePath("/dashboard/partidos");
+  return { error: null };
+}
+
+export async function resumeMatchAction(tournamentId: string, matchId: string): Promise<SimpleActionState> {
+  const auth = await requireTournamentManager(tournamentId);
+  if (!auth.ok) return { error: auth.error };
+
+  try {
+    await setMatchPaused(matchId, false);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo reanudar el partido." };
+  }
+
+  revalidatePath("/dashboard/partidos");
+  return { error: null };
+}
+
+export async function cancelMatchAction(tournamentId: string, matchId: string): Promise<SimpleActionState> {
+  const auth = await requireTournamentManager(tournamentId);
+  if (!auth.ok) return { error: auth.error };
+
+  try {
+    await cancelMatch(matchId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo cancelar el partido." };
   }
 
   revalidatePath("/dashboard/partidos");
