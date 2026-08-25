@@ -4,10 +4,13 @@ import { revalidatePath } from "next/cache";
 import { validateMatchResult, type SetScoreInput, type TeamSide } from "@padel-platform/match-engine";
 import { applyMatchResult, RATING_CONFIG, type MatchTypeForRating, type RatingMatchInput } from "@padel-platform/rating-engine";
 import {
+  clearMatchSchedule,
   fetchMatchRatingContext,
+  findScheduleConflict,
   recordRatingEvents,
   setMatchCourt,
   setMatchInProgress,
+  setMatchSchedule,
   submitResult,
 } from "../infrastructure/matchRepository";
 import { resolveScoringConfig } from "../domain/match";
@@ -88,6 +91,48 @@ export async function setMatchCourtAction(tournamentId: string, matchId: string,
     await setMatchCourt(matchId, courtId);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo asignar la pista." };
+  }
+
+  revalidatePath("/dashboard/partidos");
+  return { error: null };
+}
+
+/** Duración fija asumida por partido — no hay ningún concepto de duración modelado todavía; 90 min es razonable para pádel y solo se usa para detectar choques de horario en la misma pista. */
+const MATCH_DURATION_MINUTES = 90;
+
+export async function scheduleMatchAction(
+  tournamentId: string,
+  matchId: string,
+  courtId: string,
+  scheduledStartIso: string
+): Promise<SimpleActionState> {
+  const auth = await requireTournamentManager(tournamentId);
+  if (!auth.ok) return { error: auth.error };
+
+  const scheduledStart = new Date(scheduledStartIso);
+  const scheduledEnd = new Date(scheduledStart.getTime() + MATCH_DURATION_MINUTES * 60_000);
+
+  try {
+    const hasConflict = await findScheduleConflict(courtId, scheduledStart.toISOString(), scheduledEnd.toISOString(), matchId);
+    if (hasConflict) return { error: "Esa pista ya tiene un partido programado en ese horario." };
+
+    await setMatchSchedule(matchId, courtId, scheduledStart.toISOString(), scheduledEnd.toISOString());
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo programar el partido." };
+  }
+
+  revalidatePath("/dashboard/partidos");
+  return { error: null };
+}
+
+export async function unscheduleMatchAction(tournamentId: string, matchId: string): Promise<SimpleActionState> {
+  const auth = await requireTournamentManager(tournamentId);
+  if (!auth.ok) return { error: auth.error };
+
+  try {
+    await clearMatchSchedule(matchId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo quitar el partido del calendario." };
   }
 
   revalidatePath("/dashboard/partidos");

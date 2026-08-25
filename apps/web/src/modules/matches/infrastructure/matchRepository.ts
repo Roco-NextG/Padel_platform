@@ -19,7 +19,7 @@ function toTeamView(teamId: string | null, members: RawTeamMember[] | null | und
 }
 
 const MATCH_LIST_SELECT = `
-  id, tournament_id, phase_id, group_id, court_id, status, scheduled_start,
+  id, tournament_id, phase_id, group_id, court_id, status, scheduled_start, scheduled_end,
   team_a_id, team_b_id, winner_team_id,
   tournaments(name, scoring_config),
   tournament_phases(type, category_id, tournament_categories(name)),
@@ -56,6 +56,21 @@ export async function fetchManagedMatches(account: ClubSurfaceAccount): Promise<
   return mapMatchRows(data);
 }
 
+/** Todos los partidos reales (sin placeholders de bye) de UN torneo — para el planificador, incluye también los ya CONFIRMED/CANCELLED para poder mostrarlos "locked" en el calendario. */
+export async function fetchMatchesForTournament(tournamentId: string): Promise<MatchListItem[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("matches")
+    .select(MATCH_LIST_SELECT)
+    .eq("tournament_id", tournamentId)
+    .not("team_a_id", "is", null)
+    .not("team_b_id", "is", null)
+    .order("scheduled_start", { ascending: true, nullsFirst: false })
+    .order("created_at");
+  if (error) throw new Error(error.message);
+  return mapMatchRows(data);
+}
+
 export async function fetchMatchesForCategory(categoryId: string): Promise<MatchListItem[]> {
   const supabase = await createClient();
   const { data: phases } = await supabase.from("tournament_phases").select("id").eq("category_id", categoryId);
@@ -84,6 +99,7 @@ function mapMatchRows(rows: any[] | null): MatchListItem[] {
     courtName: m.courts?.name ?? null,
     status: m.status,
     scheduledStart: m.scheduled_start,
+    scheduledEnd: m.scheduled_end,
     teamA: toTeamView(m.team_a_id, m.team_a?.team_members),
     teamB: toTeamView(m.team_b_id, m.team_b?.team_members),
     winnerTeamId: m.winner_team_id,
@@ -214,4 +230,52 @@ export async function setMatchInProgress(matchId: string): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("matches").update({ status: "IN_PROGRESS", actual_start: new Date().toISOString() }).eq("id", matchId);
   if (error) throw new Error(error.message);
+}
+
+/** Otro partido en la misma pista cuyo [scheduled_start, scheduled_end) se superpone con el rango propuesto — excluye el propio partido y los cancelados. */
+export async function findScheduleConflict(
+  courtId: string,
+  scheduledStart: string,
+  scheduledEnd: string,
+  excludeMatchId: string
+): Promise<boolean> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("matches")
+    .select("id")
+    .eq("court_id", courtId)
+    .neq("id", excludeMatchId)
+    .neq("status", "CANCELLED")
+    .lt("scheduled_start", scheduledEnd)
+    .gt("scheduled_end", scheduledStart)
+    .limit(1);
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/** Solo reprograma partidos SCHEDULED — un partido ya en juego/confirmado no se puede mover desde el planificador. */
+export async function setMatchSchedule(matchId: string, courtId: string, scheduledStart: string, scheduledEnd: string): Promise<void> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("matches")
+    .update({ court_id: courtId, scheduled_start: scheduledStart, scheduled_end: scheduledEnd })
+    .eq("id", matchId)
+    .eq("status", "SCHEDULED")
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("El partido ya no está disponible para programar.");
+}
+
+export async function clearMatchSchedule(matchId: string): Promise<void> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("matches")
+    .update({ court_id: null, scheduled_start: null, scheduled_end: null })
+    .eq("id", matchId)
+    .eq("status", "SCHEDULED")
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("El partido ya no está disponible para desprogramar.");
 }
