@@ -19,9 +19,16 @@ const CARD_TREATMENT: Record<string, string> = {
   CANCELLED: "opacity-60 grayscale-[0.4]",
 };
 
+/**
+ * timeZone fijo (no el del entorno) — este es un Client Component, así que
+ * React hidrata: si el servidor (Vercel, UTC) y el navegador del usuario
+ * calculan la hora en zonas distintas, el texto no coincide entre el SSR y
+ * el cliente y React tira el error de hidratación #418. Fijarla acá hace
+ * que ambos lados computen exactamente lo mismo sin importar dónde corran.
+ */
 function formatTime(iso: string | null): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit", timeZone: "America/Caracas" });
 }
 
 export function MatchCard({
