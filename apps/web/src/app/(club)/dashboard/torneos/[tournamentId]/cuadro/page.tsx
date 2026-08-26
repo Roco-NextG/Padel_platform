@@ -4,34 +4,45 @@ import { notFound } from "next/navigation";
 import { getTournament } from "@/modules/tournaments/application/getTournaments";
 import { fetchCategories } from "@/modules/tournaments/infrastructure/tournamentRepository";
 import { fetchGroupStandings, fetchBracketView } from "@/modules/tournaments/infrastructure/bracketRepository";
+import { fetchMatchesForCategory } from "@/modules/matches/infrastructure/matchRepository";
 import { TournamentStatusBadge } from "@/modules/tournaments/ui/tournament-status-badge";
-import { GroupStandings } from "@/modules/tournaments/ui/group-standings";
-import { BracketView } from "@/modules/tournaments/ui/bracket-view";
+import { PhaseFlow } from "@/modules/tournaments/ui/phase-flow";
+import { LiveUpcomingStrip } from "@/modules/tournaments/ui/live-upcoming-strip";
 import { GenerateBracketButton, GenerateGroupStageButton } from "@/modules/tournaments/ui/bracket-generation-controls";
 import { categoryName } from "@/modules/tournaments/domain/category";
+import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Trophy } from "@phosphor-icons/react/dist/ssr";
 
 export const metadata: Metadata = { title: "Cuadro — Padel Platform" };
 
-export default async function CuadroPage({ params }: { params: Promise<{ tournamentId: string }> }) {
+export default async function CuadroPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ tournamentId: string }>;
+  searchParams: Promise<{ categoria?: string }>;
+}) {
   const { tournamentId } = await params;
+  const { categoria } = await searchParams;
   const tournament = await getTournament(tournamentId);
   if (!tournament) notFound();
 
   const categories = await fetchCategories(tournamentId);
-  const sections = await Promise.all(
-    categories.map(async (category) => ({
-      category,
-      groups: category.usesGroupStage ? await fetchGroupStandings(category.id) : [],
-      bracket: await fetchBracketView(category.id),
-    }))
-  );
+  const selected = categories.find((c) => c.id === categoria) ?? categories[0] ?? null;
+
+  const [groups, bracket, matches] = selected
+    ? await Promise.all([
+        selected.usesGroupStage ? fetchGroupStandings(selected.id) : Promise.resolve([]),
+        fetchBracketView(selected.id),
+        fetchMatchesForCategory(selected.id),
+      ])
+    : [[], [], []];
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex items-start justify-between gap-3">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{tournament.name}</h1>
           <p className="text-sm text-muted-foreground">
@@ -41,36 +52,50 @@ export default async function CuadroPage({ params }: { params: Promise<{ tournam
             </Link>
           </p>
         </div>
-        <TournamentStatusBadge status={tournament.status} />
+        <div className="flex items-center gap-3">
+          <TournamentStatusBadge status={tournament.status} />
+          {categories.length > 1 && (
+            <div className="flex gap-1 rounded-full border border-border-strong bg-surface p-1">
+              {categories.map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/dashboard/torneos/${tournamentId}/cuadro?categoria=${c.id}`}
+                  className={cn(
+                    "whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                    selected?.id === c.id ? "bg-foreground text-background" : "text-muted-foreground hover:bg-surface-secondary"
+                  )}
+                >
+                  {categoryName(Number(c.level), c.genderRestriction as "MALE" | "FEMALE" | "MIXED")}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {sections.length === 0 && (
+      {categories.length === 0 && (
         <EmptyState icon={Trophy} title="Sin categorías todavía" description="Agregá al menos una categoría desde Editar torneo." />
       )}
 
-      {sections.map(({ category, groups, bracket }) => (
-        <div key={category.id} className="flex flex-col gap-4">
-          <h2 className="font-display text-lg font-semibold tracking-tight">
-            {categoryName(Number(category.level), category.genderRestriction as "MALE" | "FEMALE" | "MIXED")}
-          </h2>
+      {selected && (
+        <div className="flex flex-col gap-5">
+          <LiveUpcomingStrip matches={matches} />
 
-          {category.usesGroupStage && groups.length === 0 && bracket.length === 0 && (
+          {selected.usesGroupStage && groups.length === 0 && bracket.length === 0 && (
             <Card>
-              <GenerateGroupStageButton tournamentId={tournamentId} categoryId={category.id} />
+              <GenerateGroupStageButton tournamentId={tournamentId} categoryId={selected.id} />
             </Card>
           )}
 
-          {groups.length > 0 && <GroupStandings groups={groups} />}
-
-          {bracket.length === 0 && (groups.length > 0 || !category.usesGroupStage) && (
+          {bracket.length === 0 && (groups.length > 0 || !selected.usesGroupStage) && (
             <Card>
-              <GenerateBracketButton tournamentId={tournamentId} categoryId={category.id} />
+              <GenerateBracketButton tournamentId={tournamentId} categoryId={selected.id} />
             </Card>
           )}
 
-          {bracket.length > 0 && <BracketView rounds={bracket} />}
+          {(groups.length > 0 || bracket.length > 0) && <PhaseFlow groups={groups} bracket={bracket} />}
         </div>
-      ))}
+      )}
     </div>
   );
 }

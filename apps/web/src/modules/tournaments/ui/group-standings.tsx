@@ -33,10 +33,13 @@ export function GroupStandings({ groups }: { groups: GroupStandingsView[] }) {
                   <span className={cn("flex-1 truncate text-xs font-medium", qualifies ? "text-accent-text" : "text-foreground")}>
                     {s.teamLabel}
                   </span>
-                  <span className="w-12 text-right text-[11px] text-muted-foreground">
-                    {s.matchesWon}/{s.matchesPlayed}
+                  <span className="w-14 text-right text-[10.5px] tabular-nums text-muted-foreground">
+                    {s.matchesWon}/{s.matchesPlayed} PG
                   </span>
-                  <span className="w-10 text-right text-[11px] text-muted-foreground">
+                  <span className="w-14 text-right text-[10.5px] tabular-nums text-muted-foreground">
+                    sets {s.setDiff >= 0 ? `+${s.setDiff}` : s.setDiff}
+                  </span>
+                  <span className="w-10 text-right text-[10.5px] tabular-nums text-muted-foreground">
                     {s.gameDiff >= 0 ? `+${s.gameDiff}` : s.gameDiff}
                   </span>
                   {qualifies && (

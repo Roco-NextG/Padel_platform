@@ -213,3 +213,17 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Flecha "marching ants" entre fases del cuadro (padel-platform.html: .connector .flow-dash) — el bloque de prefers-reduced-motion de arriba ya neutraliza esta animación cuando aplica. */
+@keyframes connector-dash {
+  to {
+    stroke-dashoffset: -32;
+  }
+}
+.connector-dash {
+  stroke: var(--accent-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 10;
+  stroke-linecap: round;
+  animation: connector-dash 1.6s linear infinite;
+}
