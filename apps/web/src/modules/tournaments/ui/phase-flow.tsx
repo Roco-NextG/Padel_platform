@@ -39,37 +39,42 @@ interface Section {
   content: React.ReactNode;
 }
 
-function buildSections(groups: GroupStandingsView[], bracket: BracketRoundView[]): Section[] {
+function buildSections(groups: GroupStandingsView[], bracket: BracketRoundView[], tournamentId: string): Section[] {
   const list: Section[] = [];
   if (groups.length > 0) {
+    // Editable (drag & drop entre grupos) solo si NINGÚN equipo tiene partidos jugados todavía en NINGÚN grupo — mover parejas después invalidaría estadísticas ya calculadas (misma regla dura reforzada en swapGroupTeams).
+    const groupsEditable = groups.every((g) => g.standings.every((s) => s.matchesPlayed === 0));
     list.push({
       id: "phase-groups",
       navLabel: NAV_SHORT_LABEL.GROUPS,
       heading: SECTION_HEADING.GROUPS,
       watermark: NAV_SHORT_LABEL.GROUPS.toUpperCase(),
       speed: 0.5,
-      content: <GroupStandings groups={groups} />,
+      content: <GroupStandings groups={groups} editable={groupsEditable} tournamentId={tournamentId} />,
     });
   }
   bracket.forEach((round, i) => {
+    // Editable (drag & drop de emparejamientos) solo la PRIMERA fase generada del cuadro, y solo si ninguno de sus partidos empezó todavía.
+    const isFirstRound = i === 0;
+    const roundEditable = isFirstRound && round.matches.every((m) => m.status === "SCHEDULED");
     list.push({
       id: `phase-${round.phaseId}`,
       navLabel: NAV_SHORT_LABEL[round.type],
       heading: SECTION_HEADING[round.type],
       watermark: NAV_SHORT_LABEL[round.type].toUpperCase(),
       speed: Math.max(0.5 - i * 0.12, 0.15),
-      content: <BracketColumn round={round} />,
+      content: <BracketColumn round={round} editable={roundEditable} tournamentId={tournamentId} />,
     });
   });
   return list;
 }
 
-export function PhaseFlow({ groups, bracket }: { groups: GroupStandingsView[]; bracket: BracketRoundView[] }) {
+export function PhaseFlow({ groups, bracket, tournamentId }: { groups: GroupStandingsView[]; bracket: BracketRoundView[]; tournamentId: string }) {
   const flowRef = useRef<HTMLDivElement>(null);
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const { scrollX } = useScroll({ container: flowRef });
 
-  const sections: Section[] = useMemo(() => buildSections(groups, bracket), [groups, bracket]);
+  const sections: Section[] = useMemo(() => buildSections(groups, bracket, tournamentId), [groups, bracket, tournamentId]);
   const [activeId, setActiveId] = useState<string | null>(() => sections[0]?.id ?? null);
 
   /**
