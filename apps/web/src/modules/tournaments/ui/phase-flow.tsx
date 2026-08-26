@@ -184,21 +184,26 @@ function PhaseSection({
 }) {
   const x = useTransform(scrollX, (v) => -v * speed * 0.15);
   return (
-    <div id={id} ref={registerRef} data-phase-section className="relative snap-start overflow-hidden pt-3">
-      {/* Ancho fijo con overflow oculto — sin esto, palabras largas como "DIECISEISAVOS" a 76px se extienden muy por fuera de la columna (236px) y terminan solapando el título de la fase siguiente. */}
-      <div className="pointer-events-none absolute -top-1 left-0 h-[80px] w-[380px] select-none overflow-hidden">
+    <div id={id} ref={registerRef} data-phase-section className="relative snap-start pt-3">
+      {/*
+        Zona de encabezado a ALTURA FIJA (no el ancho — el ancho de la
+        columna real de abajo puede variar): el watermark puede partirse en
+        dos líneas ("DIECISEISAVOS" no entra en una sola a este tamaño) en
+        vez de recortarse, y como la altura de esta franja es constante sin
+        importar si la palabra ocupa una o dos líneas, los partidos de abajo
+        siempre arrancan en el mismo lugar, nunca pegados al título.
+      */}
+      <div className="relative h-28 w-[260px]">
         <motion.span
           aria-hidden="true"
           style={{ x }}
-          className="block whitespace-nowrap text-[76px] font-semibold leading-none tracking-tighter text-foreground opacity-[0.035]"
+          className="pointer-events-none absolute left-0 top-0 block w-[260px] select-none whitespace-normal break-words text-[54px] font-semibold leading-[0.92] tracking-tighter text-foreground opacity-[0.05]"
         >
           {watermark}
         </motion.span>
+        <h2 className="relative z-[1] font-display text-[19px] font-medium tracking-tight text-foreground">{heading}</h2>
       </div>
-      <div className="relative z-[1] flex flex-col gap-3">
-        <h2 className="font-display text-[19px] font-medium tracking-tight text-foreground">{heading}</h2>
-        {children}
-      </div>
+      <div className="relative z-[1]">{children}</div>
     </div>
   );
 }
