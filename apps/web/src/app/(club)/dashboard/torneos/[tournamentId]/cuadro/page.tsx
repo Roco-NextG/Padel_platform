@@ -93,7 +93,7 @@ export default async function CuadroPage({
             </Card>
           )}
 
-          {(groups.length > 0 || bracket.length > 0) && <PhaseFlow groups={groups} bracket={bracket} />}
+          {(groups.length > 0 || bracket.length > 0) && <PhaseFlow groups={groups} bracket={bracket} tournamentId={tournamentId} />}
         </div>
       )}
     </div>

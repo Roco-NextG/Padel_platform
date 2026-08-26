@@ -2,6 +2,7 @@ import {
   balancedSeeding,
   calculateStandings,
   distributeIntoGroups,
+  earliestPossibleRound,
   generateBracket,
   generateGroupMatches,
   type GroupStanding,
@@ -354,4 +355,160 @@ export async function fetchBracketView(categoryId: string): Promise<BracketRound
         isBye: !m.team_a_id || !m.team_b_id,
       })),
   }));
+}
+
+/**
+ * Si el sembrado 1 y el sembrado 2 de la categoría podrían cruzarse antes
+ * de la final dado el arreglo ACTUAL de la primera ronda — mismo cálculo
+ * (earliestPossibleRound) que usa generateBracket() para separarlos al
+ * generar el cuadro por primera vez, aplicado de nuevo después de un swap
+ * manual para avisar (no bloquear) si el organizador rompió esa garantía.
+ */
+async function checkEarlySeedCollision(categoryId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data: phases } = await supabase
+    .from("tournament_phases")
+    .select("id, order_index")
+    .eq("category_id", categoryId)
+    .neq("type", "GROUPS")
+    .order("order_index");
+  if (!phases || phases.length === 0) return null;
+
+  const firstPhase = phases[0];
+  const totalRounds = phases.length;
+
+  const [{ data: round1Matches }, { data: teamSeeds }] = await Promise.all([
+    supabase.from("matches").select("round_index, team_a_id, team_b_id").eq("phase_id", firstPhase.id),
+    supabase.from("teams").select("id, seed").eq("tournament_category_id", categoryId).in("seed", [1, 2]),
+  ]);
+
+  const seed1TeamId = teamSeeds?.find((t) => t.seed === 1)?.id;
+  const seed2TeamId = teamSeeds?.find((t) => t.seed === 2)?.id;
+  if (!seed1TeamId || !seed2TeamId) return null;
+
+  const positionByTeam = new Map<string, number>();
+  for (const m of round1Matches ?? []) {
+    const roundIndex = m.round_index ?? 0;
+    if (m.team_a_id) positionByTeam.set(m.team_a_id, roundIndex * 2);
+    if (m.team_b_id) positionByTeam.set(m.team_b_id, roundIndex * 2 + 1);
+  }
+  const pos1 = positionByTeam.get(seed1TeamId);
+  const pos2 = positionByTeam.get(seed2TeamId);
+  if (pos1 == null || pos2 == null || pos1 === pos2) return null;
+
+  const earliest = earliestPossibleRound(pos1, pos2);
+  if (earliest < totalRounds) {
+    return "Con este cambio, el sembrado 1 y el sembrado 2 podrían enfrentarse antes de la final.";
+  }
+  return null;
+}
+
+export interface SwapBracketSlotsResult {
+  warning: string | null;
+}
+
+/**
+ * Intercambia dos equipos entre dos casillas de la PRIMERA fase generada del
+ * cuadro (drag & drop del organizador) — solo si ambos partidos siguen
+ * SCHEDULED (regla dura: no se puede reordenar un partido que ya empezó o
+ * ya tiene resultado). No reemplaza el sistema de siembra — es un ajuste
+ * manual sobre lo que ya generó generateBracketForCategory(); por eso
+ * avisa (sin bloquear) si el resultado rompe la garantía de separar a los
+ * dos mejores sembrados hasta la final.
+ */
+export async function swapBracketSlots(
+  matchAId: string,
+  sideA: "A" | "B",
+  matchBId: string,
+  sideB: "A" | "B"
+): Promise<SwapBracketSlotsResult> {
+  const supabase = await createClient();
+  const { data: matches, error } = await supabase
+    .from("matches")
+    .select("id, phase_id, team_a_id, team_b_id, status")
+    .in("id", [matchAId, matchBId]);
+  if (error) throw new Error(error.message);
+
+  const matchA = matches?.find((m) => m.id === matchAId);
+  const matchB = matches?.find((m) => m.id === matchBId);
+  if (!matchA || !matchB) throw new Error("No se encontró alguno de los dos partidos.");
+  if (matchA.status !== "SCHEDULED" || matchB.status !== "SCHEDULED") {
+    throw new Error("Solo se pueden intercambiar parejas de partidos que todavía no empezaron.");
+  }
+  if (!matchA.phase_id || matchA.phase_id !== matchB.phase_id) {
+    throw new Error("Solo se pueden intercambiar parejas dentro de la misma fase.");
+  }
+
+  const { data: phase } = await supabase.from("tournament_phases").select("category_id, order_index").eq("id", matchA.phase_id).single();
+  if (!phase || !phase.category_id || phase.order_index !== 1) {
+    throw new Error("Solo se puede reordenar la primera fase del cuadro generado.");
+  }
+
+  const teamInA = sideA === "A" ? matchA.team_a_id : matchA.team_b_id;
+  const teamInB = sideB === "A" ? matchB.team_a_id : matchB.team_b_id;
+
+  const updateA = sideA === "A" ? { team_a_id: teamInB } : { team_b_id: teamInB };
+  const updateB = sideB === "A" ? { team_a_id: teamInA } : { team_b_id: teamInA };
+
+  const { error: updateAError } = await supabase.from("matches").update(updateA).eq("id", matchAId);
+  if (updateAError) throw new Error(updateAError.message);
+  const { error: updateBError } = await supabase.from("matches").update(updateB).eq("id", matchBId);
+  if (updateBError) throw new Error(updateBError.message);
+
+  const warning = await checkEarlySeedCollision(phase.category_id);
+  return { warning };
+}
+
+/**
+ * Intercambia dos equipos entre sus grupos (drag & drop en la fase de
+ * grupos) — reasigna también los partidos de round-robin ya generados para
+ * que cada equipo herede el calendario del otro grupo, en vez de solo
+ * mover teams.group_id y dejar partidos con equipos "fantasma". Regla
+ * dura: bloquea si algún partido de cualquiera de los dos grupos ya no
+ * está SCHEDULED — mover equipos con partidos ya jugados invalidaría las
+ * estadísticas ya calculadas.
+ */
+export async function swapGroupTeams(teamAId: string, teamBId: string): Promise<void> {
+  const supabase = await createClient();
+  const { data: teams, error } = await supabase.from("teams").select("id, group_id").in("id", [teamAId, teamBId]);
+  if (error) throw new Error(error.message);
+
+  const teamA = teams?.find((t) => t.id === teamAId);
+  const teamB = teams?.find((t) => t.id === teamBId);
+  if (!teamA?.group_id || !teamB?.group_id) throw new Error("No se encontró alguna de las dos parejas o no tiene grupo asignado.");
+  if (teamA.group_id === teamB.group_id) return;
+
+  const { data: groupMatches, error: matchesError } = await supabase
+    .from("matches")
+    .select("id, status, team_a_id, team_b_id")
+    .in("group_id", [teamA.group_id, teamB.group_id]);
+  if (matchesError) throw new Error(matchesError.message);
+  if ((groupMatches ?? []).some((m) => m.status !== "SCHEDULED")) {
+    throw new Error("No se puede mover parejas de un grupo que ya jugó algún partido.");
+  }
+
+  for (const m of groupMatches ?? []) {
+    let nextTeamA: string | undefined;
+    let nextTeamB: string | undefined;
+    if (m.team_a_id === teamAId) nextTeamA = teamBId;
+    else if (m.team_a_id === teamBId) nextTeamA = teamAId;
+    if (m.team_b_id === teamAId) nextTeamB = teamBId;
+    else if (m.team_b_id === teamBId) nextTeamB = teamAId;
+
+    if (nextTeamA !== undefined && nextTeamB !== undefined) {
+      const { error: patchError } = await supabase.from("matches").update({ team_a_id: nextTeamA, team_b_id: nextTeamB }).eq("id", m.id);
+      if (patchError) throw new Error(patchError.message);
+    } else if (nextTeamA !== undefined) {
+      const { error: patchError } = await supabase.from("matches").update({ team_a_id: nextTeamA }).eq("id", m.id);
+      if (patchError) throw new Error(patchError.message);
+    } else if (nextTeamB !== undefined) {
+      const { error: patchError } = await supabase.from("matches").update({ team_b_id: nextTeamB }).eq("id", m.id);
+      if (patchError) throw new Error(patchError.message);
+    }
+  }
+
+  const { error: err1 } = await supabase.from("teams").update({ group_id: teamB.group_id }).eq("id", teamAId);
+  if (err1) throw new Error(err1.message);
+  const { error: err2 } = await supabase.from("teams").update({ group_id: teamA.group_id }).eq("id", teamBId);
+  if (err2) throw new Error(err2.message);
 }
