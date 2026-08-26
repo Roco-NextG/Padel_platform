@@ -20,12 +20,13 @@ const NAV_SHORT_LABEL: Record<PhaseType, string> = {
   CONSOLATION: "Consolación",
 };
 
+/** Encabezado de cada sección — mismo texto corto que el phase-nav (sin "de final"/"semifinal"), pedido explícito para no repetir la palabra en cada fase. */
 const SECTION_HEADING: Record<PhaseType, string> = {
   GROUPS: "Fase de grupos",
-  ROUND_OF_32: "Dieciseisavos de final",
-  ROUND_OF_16: "Octavos de final",
-  QUARTERFINAL: "Cuartos de final",
-  SEMIFINAL: "Semifinal",
+  ROUND_OF_32: "Dieciseisavos",
+  ROUND_OF_16: "Octavos",
+  QUARTERFINAL: "Cuartos",
+  SEMIFINAL: "Semis",
   FINAL: "Final",
   CONSOLATION: "Consolación",
 };
@@ -140,7 +141,7 @@ export function PhaseFlow({ groups, bracket, tournamentId }: { groups: GroupStan
         ))}
       </nav>
 
-      <div ref={flowRef} className="flex snap-x snap-proximity items-start gap-10 overflow-x-auto pb-6 [scrollbar-width:thin]">
+      <div ref={flowRef} className="flex snap-x snap-proximity items-start gap-20 overflow-x-auto pb-6 [scrollbar-width:thin]">
         {sections.map((s, i) => (
           <div key={s.id} className="flex shrink-0 items-center gap-10">
             {i > 0 && <PhaseConnector />}
@@ -183,14 +184,17 @@ function PhaseSection({
 }) {
   const x = useTransform(scrollX, (v) => -v * speed * 0.15);
   return (
-    <div id={id} ref={registerRef} data-phase-section className="relative snap-start pt-3">
-      <motion.span
-        aria-hidden="true"
-        style={{ x }}
-        className="pointer-events-none absolute -top-1 left-0 select-none whitespace-nowrap text-[76px] font-semibold leading-none tracking-tighter text-foreground opacity-[0.035]"
-      >
-        {watermark}
-      </motion.span>
+    <div id={id} ref={registerRef} data-phase-section className="relative snap-start overflow-hidden pt-3">
+      {/* Ancho fijo con overflow oculto — sin esto, palabras largas como "DIECISEISAVOS" a 76px se extienden muy por fuera de la columna (236px) y terminan solapando el título de la fase siguiente. */}
+      <div className="pointer-events-none absolute -top-1 left-0 h-[80px] w-[380px] select-none overflow-hidden">
+        <motion.span
+          aria-hidden="true"
+          style={{ x }}
+          className="block whitespace-nowrap text-[76px] font-semibold leading-none tracking-tighter text-foreground opacity-[0.035]"
+        >
+          {watermark}
+        </motion.span>
+      </div>
       <div className="relative z-[1] flex flex-col gap-3">
         <h2 className="font-display text-[19px] font-medium tracking-tight text-foreground">{heading}</h2>
         {children}
