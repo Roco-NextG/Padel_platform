@@ -3,6 +3,7 @@ import type { RatingEventOutput } from "@padel-platform/rating-engine";
 import type { SetScoreInput } from "@padel-platform/match-engine";
 import { resolveScoringConfig, type MatchListItem, type MatchTeamView } from "../domain/match";
 import type { ClubSurfaceAccount } from "@/modules/shell/infrastructure/accountRepository";
+import { DEFAULT_TIME_ZONE } from "@/lib/timezone";
 
 interface RawTeamMember {
   players: { id: string; first_name: string; last_name: string } | null;
@@ -21,12 +22,13 @@ function toTeamView(teamId: string | null, members: RawTeamMember[] | null | und
 const MATCH_LIST_SELECT = `
   id, tournament_id, phase_id, group_id, court_id, status, is_paused, scheduled_start, scheduled_end, actual_start,
   team_a_id, team_b_id, winner_team_id,
-  tournaments(name, scoring_config, clubs(name)),
+  tournaments(name, scoring_config, clubs(name, time_zone)),
   tournament_phases(type, category_id, tournament_categories(name)),
   tournament_groups(name),
   courts(name),
   team_a:teams!matches_team_a_id_fkey(id, team_members(players(id, first_name, last_name))),
-  team_b:teams!matches_team_b_id_fkey(id, team_members(players(id, first_name, last_name)))
+  team_b:teams!matches_team_b_id_fkey(id, team_members(players(id, first_name, last_name))),
+  set_scores(set_number, team_a_games, team_b_games, tiebreak_a, tiebreak_b)
 `;
 
 /** Todos los partidos "activos" (no terminados) de los torneos que administra esta cuenta — cross-tournament, para la pantalla Partidos. */
@@ -46,7 +48,7 @@ export async function fetchManagedMatches(account: ClubSurfaceAccount): Promise<
     .from("matches")
     .select(MATCH_LIST_SELECT)
     .in("tournament_id", tournamentIds)
-    .in("status", ["SCHEDULED", "IN_PROGRESS", "PENDING_CONFIRMATION", "DISPUTED", "CANCELLED"])
+    .in("status", ["SCHEDULED", "IN_PROGRESS", "PENDING_CONFIRMATION", "DISPUTED", "CANCELLED", "CONFIRMED"])
     .not("team_a_id", "is", null)
     .not("team_b_id", "is", null)
     .order("scheduled_start", { ascending: true, nullsFirst: false })
@@ -87,12 +89,26 @@ export async function fetchMatchesForCategory(categoryId: string): Promise<Match
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapSets(raw: any[] | null | undefined): SetScoreInput[] {
+  return [...(raw ?? [])]
+    .sort((a, b) => a.set_number - b.set_number)
+    .map((s) => ({
+      setNumber: s.set_number,
+      teamAGames: s.team_a_games,
+      teamBGames: s.team_b_games,
+      tiebreakA: s.tiebreak_a,
+      tiebreakB: s.tiebreak_b,
+    }));
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapMatchRows(rows: any[] | null): MatchListItem[] {
   return (rows ?? []).map((m) => ({
     id: m.id,
     tournamentId: m.tournament_id,
     tournamentName: m.tournaments?.name ?? "?",
     clubName: m.tournaments?.clubs?.name ?? "?",
+    clubTimeZone: m.tournaments?.clubs?.time_zone ?? DEFAULT_TIME_ZONE,
     categoryName: m.tournament_phases?.tournament_categories?.name ?? "?",
     phaseLabel: m.tournament_phases?.type ?? "?",
     groupName: m.tournament_groups?.name ?? null,
@@ -107,6 +123,7 @@ function mapMatchRows(rows: any[] | null): MatchListItem[] {
     teamB: toTeamView(m.team_b_id, m.team_b?.team_members),
     winnerTeamId: m.winner_team_id,
     scoringConfig: resolveScoringConfig(m.tournaments?.scoring_config ?? {}),
+    sets: mapSets(m.set_scores),
   }));
 }
 

@@ -3,6 +3,7 @@ import type { CreateTournamentInput, Tournament, UpdateTournamentInput } from ".
 import type { TournamentCategory } from "../domain/category";
 import { categoryName } from "../domain/category";
 import type { ClubSurfaceAccount } from "@/modules/shell/infrastructure/accountRepository";
+import { DEFAULT_TIME_ZONE } from "@/lib/timezone";
 
 /**
  * "Mis torneos" para una cuenta Club: club_id = la propia, organizer_id
@@ -14,7 +15,7 @@ export async function fetchMyTournaments(account: ClubSurfaceAccount): Promise<T
   const supabase = await createClient();
   let query = supabase
     .from("tournaments")
-    .select("id, name, description, club_id, organizer_id, status, is_published, start_date, end_date, created_at, clubs(name)")
+    .select("id, name, description, club_id, organizer_id, status, is_published, start_date, end_date, created_at, clubs(name, time_zone)")
     .order("created_at", { ascending: false });
 
   query = account.role === "Club" ? query.eq("club_id", account.clubId!).is("organizer_id", null) : query.eq("organizer_id", account.organizerId!);
@@ -51,6 +52,7 @@ export async function fetchMyTournaments(account: ClubSurfaceAccount): Promise<T
     description: t.description,
     clubId: t.club_id,
     clubName: (t.clubs as unknown as { name: string } | null)?.name ?? "?",
+    clubTimeZone: (t.clubs as unknown as { time_zone: string } | null)?.time_zone ?? DEFAULT_TIME_ZONE,
     organizerId: t.organizer_id,
     status: t.status,
     isPublished: t.is_published,
@@ -66,7 +68,7 @@ export async function fetchTournamentById(tournamentId: string): Promise<Tournam
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id, name, description, club_id, organizer_id, status, is_published, start_date, end_date, created_at, clubs(name)")
+    .select("id, name, description, club_id, organizer_id, status, is_published, start_date, end_date, created_at, clubs(name, time_zone)")
     .eq("id", tournamentId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -78,6 +80,7 @@ export async function fetchTournamentById(tournamentId: string): Promise<Tournam
     description: data.description,
     clubId: data.club_id,
     clubName: (data.clubs as unknown as { name: string } | null)?.name ?? "?",
+    clubTimeZone: (data.clubs as unknown as { time_zone: string } | null)?.time_zone ?? DEFAULT_TIME_ZONE,
     organizerId: data.organizer_id,
     status: data.status,
     isPublished: data.is_published,

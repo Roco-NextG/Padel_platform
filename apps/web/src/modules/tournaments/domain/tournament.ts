@@ -9,6 +9,7 @@ export interface Tournament {
   description: string | null;
   clubId: string;
   clubName: string;
+  clubTimeZone: string;
   organizerId: string | null;
   status: TournamentStatus;
   isPublished: boolean;

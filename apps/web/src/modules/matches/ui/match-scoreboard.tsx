@@ -35,6 +35,7 @@ export function MatchScoreboard({
   teamB,
   scoringConfig,
   editable,
+  initialSets,
   onConfirmed,
 }: {
   tournamentId: string;
@@ -43,13 +44,15 @@ export function MatchScoreboard({
   teamB: MatchTeamView | null;
   scoringConfig: ScoringConfig;
   editable: boolean;
+  /** Marcador ya registrado en `set_scores` — se usa como estado inicial para partidos que se cargan ya con resultado (p. ej. Confirmados). */
+  initialSets?: SetScoreInput[];
   onConfirmed: () => void;
 }) {
   const digitStripId = useId();
   const maxSets = scoringConfig.setsToWin * 2 - 1;
   const decisiveIndex = scoringConfig.finalSetMode === "SUPER_TIEBREAK" ? maxSets - 1 : -1;
 
-  const [sets, setSets] = useState<SetScoreInput[]>([emptySet(1)]);
+  const [sets, setSets] = useState<SetScoreInput[]>(() => (initialSets && initialSets.length > 0 ? initialSets : [emptySet(1)]));
   const [editorOpen, setEditorOpen] = useState(false);
   const [selected, setSelected] = useState<Selected | null>(null);
   const [error, setError] = useState<string | null>(null);

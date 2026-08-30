@@ -73,7 +73,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const scheduled = matches.filter((m) => m.status === "SCHEDULED");
   const busyCourtIds = new Set(inProgress.map((m) => m.courtId).filter((id): id is string => id !== null));
 
-  const today = formatZonedDate(new Date().toISOString(), { weekday: "long", day: "numeric", month: "long" });
+  const today = formatZonedDate(new Date().toISOString(), { weekday: "long", day: "numeric", month: "long" }, account.timeZone);
   const firstName = account.contactName.split(" ")[0];
 
   return (

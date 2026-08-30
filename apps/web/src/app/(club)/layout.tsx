@@ -5,8 +5,10 @@ import { signOutAction } from "@/modules/auth/application/actions";
 import { fetchClubSurfaceAccount } from "@/modules/shell/infrastructure/accountRepository";
 import { fetchManagedMatches } from "@/modules/matches/infrastructure/matchRepository";
 import { ClubSidebar } from "@/modules/shell/ui/club-sidebar";
+import { HeaderClock } from "@/modules/shell/ui/header-clock";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { DEFAULT_TIME_ZONE } from "@/lib/timezone";
 
 export default async function ClubLayout({ children }: { children: React.ReactNode }) {
   const context = await getCurrentUserContext();
@@ -27,6 +29,7 @@ export default async function ClubLayout({ children }: { children: React.ReactNo
       />
       <div className="flex flex-1 flex-col">
         <header className="flex items-center justify-end gap-3 pb-3">
+          <HeaderClock timeZone={account?.timeZone ?? DEFAULT_TIME_ZONE} />
           <span className="text-sm text-muted-foreground">{context.email}</span>
           <ThemeToggle />
           <form action={signOutAction}>
