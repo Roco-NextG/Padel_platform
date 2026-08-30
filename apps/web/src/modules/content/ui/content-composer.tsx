@@ -33,6 +33,10 @@ const SCORE_STYLE_OPTIONS: { id: ScoreStickerStyle; label: string }[] = [
   { id: "winner", label: "Ganador" },
 ];
 
+/** Tamaño máximo del preview — el post (1:1) llena hasta 440px de ancho; los formatos altos (story/tiktok, 9:16) quedan acotados por la altura para no desbordar la columna. */
+const PREVIEW_MAX_WIDTH = 440;
+const PREVIEW_MAX_HEIGHT = 560;
+
 function itemPreviewLabel(item: ContentItem): string {
   if (item.type === "result") return `${item.teamA.label} vs ${item.teamB.label}`;
   if (item.type === "upcoming") return `${item.teamA.label} vs ${item.teamB.label}`;
@@ -55,6 +59,9 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
 
   const [format, setFormat] = useState<FormatId>("post");
   const formatDef = FORMATS.find((f) => f.id === format)!;
+  const previewScale = Math.min(PREVIEW_MAX_WIDTH / formatDef.width, PREVIEW_MAX_HEIGHT / formatDef.height);
+  const previewWidth = formatDef.width * previewScale;
+  const previewHeight = formatDef.height * previewScale;
   const [background, setBackground] = useState<BackgroundStyle>("court");
   const [uploadUrl, setUploadUrl] = useState<string | null>(null);
   const [scoreStyle, setScoreStyle] = useState<ScoreStickerStyle>("bar");
@@ -164,11 +171,18 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
                 setSlideIndex(0);
               }}
               className={cn(
-                "rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
-                activeDay === d ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                "relative rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
+                activeDay === d ? "text-foreground" : "text-muted-foreground hover:text-foreground"
               )}
             >
-              {feed.items.find((i) => i.dateKey === d)?.dateLabel}
+              {activeDay === d && (
+                <motion.span
+                  layoutId="content-day-active"
+                  className="absolute inset-0 rounded-full bg-surface shadow-sm"
+                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                />
+              )}
+              <span className="relative">{feed.items.find((i) => i.dateKey === d)?.dateLabel}</span>
             </button>
           ))}
         </div>
@@ -176,10 +190,11 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
 
       <div className="flex gap-3 overflow-x-auto pb-1">
         {dayItems.map((item) => (
-          <button
+          <motion.button
             key={item.id}
             type="button"
             onClick={() => selectItem(item)}
+            whileTap={{ scale: 0.96 }}
             className={cn(
               "flex w-28 shrink-0 flex-col gap-1.5 rounded-md border p-2 text-left transition-colors",
               activeItem?.id === item.id ? "border-accent" : "border-border hover:border-border-strong"
@@ -189,7 +204,7 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
               {item.type === "result" ? <Trophy className="size-4" weight="fill" /> : item.type === "upcoming" ? <CalendarBlank className="size-4" /> : <Rows className="size-4" />}
             </div>
             <span className="truncate text-[11px] font-medium text-foreground">{itemPreviewLabel(item)}</span>
-          </button>
+          </motion.button>
         ))}
       </div>
 
@@ -199,19 +214,19 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
             <div className="relative">
               <div
                 style={{
-                  width: 300,
-                  height: (formatDef.height / formatDef.width) * 300,
+                  width: previewWidth,
+                  height: previewHeight,
                   overflow: "hidden",
                   borderRadius: 12,
                 }}
               >
                 {/* Preview: visualmente escalado, NUNCA es el target de html2canvas —
                     getBoundingClientRect() de un nodo con transform:scale() devuelve el
-                    tamaño YA escalado (300px), no el real (1080px+), así que capturar
+                    tamaño YA escalado (previewWidth), no el real (1080px+), así que capturar
                     este nodo exportaría una imagen diminuta. Confirmado en vivo con el
                     log de debug de html2canvas ("size 300x533" en vez de 1080x1920)
                     antes de separar preview/export en dos nodos distintos. */}
-                <div style={{ transform: `scale(${300 / formatDef.width})`, transformOrigin: "top left" }}>
+                <div style={{ transform: `scale(${previewScale})`, transformOrigin: "top left" }}>
                   <GenSlide
                     item={currentSlideItem}
                     format={formatDef}
@@ -281,20 +296,21 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
             <span className="text-xs font-medium text-muted-foreground">Formato</span>
             <div className="grid grid-cols-2 gap-1.5">
               {FORMATS.map((f) => (
-                <button
+                <motion.button
                   key={f.id}
                   type="button"
                   onClick={() => {
                     setFormat(f.id);
                     setSlideIndex(0);
                   }}
+                  whileTap={{ scale: 0.96 }}
                   className={cn(
                     "rounded-md border px-2.5 py-2 text-xs font-medium transition-colors",
                     format === f.id ? "border-accent bg-accent-muted text-accent-text" : "border-border text-muted-foreground hover:border-border-strong"
                   )}
                 >
                   {f.label}
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
@@ -303,10 +319,11 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
             <span className="text-xs font-medium text-muted-foreground">Fondo</span>
             <div className="grid grid-cols-2 gap-1.5">
               {BG_OPTIONS.map((b) => (
-                <button
+                <motion.button
                   key={b.id}
                   type="button"
                   onClick={() => (b.id === "upload" ? fileInputRef.current?.click() : setBackground(b.id))}
+                  whileTap={{ scale: 0.96 }}
                   className={cn(
                     "flex items-center justify-center gap-1.5 rounded-md border px-2.5 py-2 text-xs font-medium transition-colors",
                     background === b.id ? "border-accent bg-accent-muted text-accent-text" : "border-border text-muted-foreground hover:border-border-strong"
@@ -314,7 +331,7 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
                 >
                   {b.id === "upload" && <UploadSimple className="size-3.5" />}
                   {b.label}
-                </button>
+                </motion.button>
               ))}
             </div>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
@@ -346,7 +363,12 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
           )}
 
           <div className="flex flex-col gap-2 rounded-md border border-border p-3">
-            <ToggleRow label="Mostrar marcador" checked={showScore} onChange={setShowScore} />
+            <ToggleRow
+              label="Mostrar marcador"
+              checked={showScore}
+              onChange={setShowScore}
+              disabled={currentSlideItem?.type !== "result"}
+            />
             <ToggleRow label="Logo del torneo" checked={showLogo} onChange={setShowLogo} />
             <ToggleRow label="Patrocinadores" checked={showSponsors} onChange={setShowSponsors} disabled={feed.sponsors.length === 0} />
           </div>
@@ -381,18 +403,22 @@ function ToggleRow({
   disabled?: boolean;
 }) {
   return (
-    <label className={cn("flex items-center justify-between gap-3 text-xs", disabled ? "opacity-40" : "text-foreground")}>
+    <label className={cn("flex items-center justify-between gap-3 text-xs font-medium", disabled ? "opacity-40" : "text-foreground")}>
       {label}
       <button
         type="button"
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={cn("relative h-5 w-9 rounded-full transition-colors", checked ? "bg-accent" : "bg-border-strong")}
+        aria-pressed={checked}
+        className={cn(
+          "relative h-[22px] w-9 shrink-0 rounded-full border transition-colors",
+          checked ? "border-transparent bg-accent-strong" : "border-border-strong bg-surface-secondary"
+        )}
       >
         <motion.span
           animate={{ x: checked ? 16 : 2 }}
           transition={{ type: "spring", stiffness: 500, damping: 32 }}
-          className="absolute top-0.5 size-4 rounded-full bg-white shadow-sm"
+          className="absolute top-0.5 size-4 rounded-full bg-white shadow-md"
         />
       </button>
     </label>
