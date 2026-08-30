@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { formatZonedDate, formatZonedTime, zonedDateKey } from "@/lib/timezone";
+import { DEFAULT_TIME_ZONE, formatZonedDate, formatZonedTime, zonedDateKey } from "@/lib/timezone";
 import { initialsFor, type ContentItem, type ContentTeam } from "../domain/content";
 
 interface RawTeamMember {
@@ -14,18 +14,18 @@ function teamFromMembers(members: RawTeamMember[] | null | undefined): ContentTe
   return { label, initials: initialsFor(label) };
 }
 
-/** zonedDateKey (no un slice de string) — un partido a las 23:30 en América/Caracas queda guardado como 03:30 UTC del día siguiente; agrupar por el string UTC crudo lo metía en el día equivocado. */
-function dateKeyOf(iso: string): string {
-  return zonedDateKey(iso);
+/** zonedDateKey (no un slice de string) — un partido a las 23:30 queda guardado como 03:30 UTC del día siguiente; agrupar por el string UTC crudo lo metía en el día equivocado. Siempre en la zona del club donde se juega el torneo, no una constante. */
+function dateKeyOf(iso: string, timeZone: string): string {
+  return zonedDateKey(iso, timeZone);
 }
 
-function dateLabelOf(iso: string): string {
-  return formatZonedDate(iso, { weekday: "short", day: "numeric", month: "short" }).toUpperCase();
+function dateLabelOf(iso: string, timeZone: string): string {
+  return formatZonedDate(iso, { weekday: "short", day: "numeric", month: "short" }, timeZone).toUpperCase();
 }
 
-function timeLabelOf(iso: string | null): string {
+function timeLabelOf(iso: string | null, timeZone: string): string {
   if (!iso) return "";
-  return formatZonedTime(iso);
+  return formatZonedTime(iso, timeZone);
 }
 
 const CONTENT_MATCH_SELECT = `
@@ -48,7 +48,7 @@ export async function fetchContentFeed(tournamentId: string): Promise<ContentFee
 
   const [{ data: tournament, error: tournamentError }, { data: sponsors, error: sponsorsError }, { data: matches, error: matchesError }] =
     await Promise.all([
-      supabase.from("tournaments").select("name").eq("id", tournamentId).single(),
+      supabase.from("tournaments").select("name, clubs(time_zone)").eq("id", tournamentId).single(),
       supabase.from("sponsors").select("id, name, logo_url").eq("tournament_id", tournamentId),
       supabase
         .from("matches")
@@ -63,6 +63,8 @@ export async function fetchContentFeed(tournamentId: string): Promise<ContentFee
   if (sponsorsError) throw new Error(sponsorsError.message);
   if (matchesError) throw new Error(matchesError.message);
 
+  const clubTimeZone = (tournament as unknown as { clubs: { time_zone: string } | null } | null)?.clubs?.time_zone ?? DEFAULT_TIME_ZONE;
+
   const items: ContentItem[] = [];
   const resultsByDay = new Map<string, { teamA: string; teamB: string; score: string }[]>();
   const dayLabels = new Map<string, string>();
@@ -71,15 +73,15 @@ export async function fetchContentFeed(tournamentId: string): Promise<ContentFee
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mm = m as any;
     const referenceTime: string = mm.actual_start ?? mm.scheduled_start ?? mm.created_at;
-    const dateKey = dateKeyOf(referenceTime);
-    const dateLabel = dateLabelOf(referenceTime);
+    const dateKey = dateKeyOf(referenceTime, clubTimeZone);
+    const dateLabel = dateLabelOf(referenceTime, clubTimeZone);
     dayLabels.set(dateKey, dateLabel);
 
     const teamA = teamFromMembers(mm.team_a?.team_members);
     const teamB = teamFromMembers(mm.team_b?.team_members);
     const category = mm.tournament_phases?.tournament_categories?.name ?? "Sin categoría";
     const court = mm.courts?.name ?? null;
-    const time = timeLabelOf(mm.actual_start ?? mm.scheduled_start);
+    const time = timeLabelOf(mm.actual_start ?? mm.scheduled_start, clubTimeZone);
 
     if (mm.status === "CONFIRMED" && mm.winner_team_id) {
       const sets: [number, number][] = (mm.set_scores ?? [])

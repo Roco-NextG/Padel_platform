@@ -19,6 +19,7 @@ export function SchedulerBoardLoader(props: {
   matches: MatchListItem[];
   courts: { id: string; name: string }[];
   initialDate: string;
+  clubTimeZone: string;
 }) {
   // key=tournamentId fuerza el remount al cambiar de torneo — SchedulerBoard
   // guarda matches/fecha/categoría en useState propio; sin esto, cambiar de

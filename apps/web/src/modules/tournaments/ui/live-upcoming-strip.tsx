@@ -40,7 +40,7 @@ export function LiveUpcomingStrip({ matches }: { matches: MatchListItem[] }) {
             {upcoming.map((m) => (
               <div key={m.id} className="flex shrink-0 flex-col gap-0.5 rounded-lg bg-surface-secondary px-3 py-1.5">
                 <span className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
-                  {m.scheduledStart ? formatZonedTime(m.scheduledStart) : ""}
+                  {m.scheduledStart ? formatZonedTime(m.scheduledStart, m.clubTimeZone) : ""}
                   {m.courtName ? ` · ${m.courtName}` : ""}
                 </span>
                 <span className="text-xs font-medium text-foreground">

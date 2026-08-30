@@ -129,11 +129,13 @@ export function SchedulerBoard({
   matches: initialMatches,
   courts,
   initialDate,
+  clubTimeZone,
 }: {
   tournamentId: string;
   matches: MatchListItem[];
   courts: { id: string; name: string }[];
   initialDate: string;
+  clubTimeZone: string;
 }) {
   const [matches, setMatches] = useState(initialMatches);
   const [selectedDate, setSelectedDate] = useState(initialDate);
@@ -153,11 +155,11 @@ export function SchedulerBoard({
     for (const m of matches) {
       if (!m.scheduledStart || !m.courtId) continue;
       if (categoryFilter !== "Todas" && m.categoryName !== categoryFilter) continue;
-      if (zonedDateKey(m.scheduledStart) !== selectedDate) continue;
-      map.set(`${m.courtId}:${zonedTimeKey(m.scheduledStart)}`, m);
+      if (zonedDateKey(m.scheduledStart, clubTimeZone) !== selectedDate) continue;
+      map.set(`${m.courtId}:${zonedTimeKey(m.scheduledStart, clubTimeZone)}`, m);
     }
     return map;
-  }, [matches, selectedDate, categoryFilter]);
+  }, [matches, selectedDate, categoryFilter, clubTimeZone]);
 
   function applyScheduleUpdate(matchId: string, courtId: string | null, scheduledStart: string | null, scheduledEnd: string | null) {
     setMatches((prev) => prev.map((m) => (m.id === matchId ? { ...m, courtId, scheduledStart, scheduledEnd } : m)));
@@ -193,7 +195,7 @@ export function SchedulerBoard({
     const [, courtId, time] = overId.split(":");
     if (!courtId || !time) return;
 
-    const scheduledStartIso = zonedSlotToIso(selectedDate, time);
+    const scheduledStartIso = zonedSlotToIso(selectedDate, time, clubTimeZone);
     const scheduledEnd = new Date(new Date(scheduledStartIso).getTime() + 90 * 60_000).toISOString();
     const conflict = matches.some(
       (m) =>

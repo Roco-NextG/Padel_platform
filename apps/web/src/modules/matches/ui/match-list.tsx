@@ -8,13 +8,14 @@ import { cn } from "@/lib/utils";
 import { MatchCard } from "./match-card";
 import { matchDisplayStatus, MATCH_DISPLAY_STATUS_ORDER, type MatchDisplayStatus, type MatchListItem } from "../domain/match";
 
-type FilterKey = "TODOS" | "LIVE" | "UPCOMING" | "PAUSED" | "CANCELLED";
+type FilterKey = "TODOS" | "LIVE" | "UPCOMING" | "PAUSED" | "DONE" | "CANCELLED";
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "TODOS", label: "Todos" },
   { key: "LIVE", label: "En vivo" },
   { key: "UPCOMING", label: "Próximos" },
   { key: "PAUSED", label: "Pausados" },
+  { key: "DONE", label: "Finalizados" },
   { key: "CANCELLED", label: "Cancelados" },
 ];
 
@@ -83,7 +84,7 @@ export function MatchList({
                   courts={courtsByTournamentId[m.tournamentId] ?? []}
                   showTournamentName={showTournamentName}
                   onUpdate={(patch) => setMatches((prev) => prev.map((x) => (x.id === m.id ? { ...x, ...patch } : x)))}
-                  onConfirmed={() => setMatches((prev) => prev.filter((x) => x.id !== m.id))}
+                  onConfirmed={() => setMatches((prev) => prev.map((x) => (x.id === m.id ? { ...x, status: "CONFIRMED" } : x)))}
                 />
               </motion.div>
             ))}

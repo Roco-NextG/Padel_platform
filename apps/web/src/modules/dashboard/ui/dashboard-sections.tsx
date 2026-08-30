@@ -63,7 +63,7 @@ const STATUS_PILL_CLASSES: Record<string, string> = {
 };
 
 function MatchRow({ match, showClubName }: { match: MatchListItem; showClubName: boolean }) {
-  const time = match.scheduledStart ? formatZonedTime(match.scheduledStart) : "--:--";
+  const time = match.scheduledStart ? formatZonedTime(match.scheduledStart, match.clubTimeZone) : "--:--";
 
   return (
     <div className="flex items-center gap-4 border-b border-border px-4 py-3.5 last:border-0">

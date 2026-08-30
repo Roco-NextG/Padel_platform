@@ -20,9 +20,9 @@ const CARD_TREATMENT: Record<string, string> = {
   CANCELLED: "opacity-60 grayscale-[0.4]",
 };
 
-function formatTime(iso: string | null): string {
+function formatTime(iso: string | null, timeZone: string): string {
   if (!iso) return "";
-  return formatZonedTime(iso);
+  return formatZonedTime(iso, timeZone);
 }
 
 export function MatchCard({
@@ -60,10 +60,10 @@ export function MatchCard({
   const timeText =
     displayStatus === "LIVE" || displayStatus === "PAUSED"
       ? match.actualStart
-        ? `Desde ${formatTime(match.actualStart)}`
+        ? `Desde ${formatTime(match.actualStart, match.clubTimeZone)}`
         : ""
       : displayStatus === "UPCOMING"
-        ? formatTime(match.scheduledStart)
+        ? formatTime(match.scheduledStart, match.clubTimeZone)
         : "";
 
   function handleStart() {
@@ -183,6 +183,7 @@ export function MatchCard({
         teamB={match.teamB}
         scoringConfig={match.scoringConfig}
         editable={editable}
+        initialSets={match.sets}
         onConfirmed={onConfirmed}
       />
 

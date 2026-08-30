@@ -74,6 +74,7 @@ export interface Database {
           contact_first_name: string | null;
           contact_last_name: string | null;
           contact_phone: string | null;
+          time_zone: string;
           is_active: boolean;
           created_at: string;
           updated_at: string;
@@ -86,6 +87,7 @@ export interface Database {
           contact_first_name?: string | null;
           contact_last_name?: string | null;
           contact_phone?: string | null;
+          time_zone?: string;
           is_active?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["clubs"]["Insert"]>;
@@ -100,6 +102,7 @@ export interface Database {
           contact_first_name: string | null;
           contact_last_name: string | null;
           contact_phone: string | null;
+          time_zone: string;
           is_active: boolean;
           created_at: string;
           updated_at: string;
@@ -112,6 +115,7 @@ export interface Database {
           contact_first_name?: string | null;
           contact_last_name?: string | null;
           contact_phone?: string | null;
+          time_zone?: string;
           is_active?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["organizers"]["Insert"]>;

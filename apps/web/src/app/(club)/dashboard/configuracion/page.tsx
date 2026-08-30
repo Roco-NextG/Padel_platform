@@ -4,6 +4,8 @@ import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUser
 import { fetchClubSurfaceAccount } from "@/modules/shell/infrastructure/accountRepository";
 import { fetchClubCourts } from "@/modules/courts/infrastructure/courtRepository";
 import { CourtsManager } from "@/modules/courts/ui/courts-manager";
+import { TimeZoneSelector } from "@/modules/shell/ui/timezone-selector";
+import { listTimeZones } from "@/lib/timezone";
 import { Card } from "@/components/ui/card";
 
 export const metadata: Metadata = { title: "Configuración — Padel Platform" };
@@ -31,6 +33,20 @@ export default async function ConfiguracionPage() {
         </p>
       </div>
 
+      <div className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-sm font-medium text-foreground">Zona horaria</h2>
+          <p className="text-xs text-muted-foreground">
+            {account.role === "Club"
+              ? "La zona horaria de tu club — así se calculan las horas de tus partidos."
+              : "Tu zona horaria personal, para el reloj del panel. Cada partido igual se muestra en la hora del club donde se juega."}
+          </p>
+        </div>
+        <Card>
+          <TimeZoneSelector currentTimeZone={account.timeZone} timeZones={listTimeZones()} />
+        </Card>
+      </div>
+
       {account.role === "Club" && account.clubId && (
         <div className="flex flex-col gap-3">
           <div>
@@ -41,14 +57,6 @@ export default async function ConfiguracionPage() {
           </div>
           <CourtsManager clubId={account.clubId} courts={await fetchClubCourts(account.clubId)} />
         </div>
-      )}
-
-      {account.role === "Organizador" && (
-        <Card>
-          <p className="text-sm text-muted-foreground">
-            Configuración de perfil del organizador — llega en una próxima etapa.
-          </p>
-        </Card>
       )}
     </div>
   );

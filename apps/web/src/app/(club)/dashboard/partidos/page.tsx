@@ -87,7 +87,7 @@ export default async function PartidosPage({
       fetchClubCourts(selectedTournament.clubId),
     ]);
     const availableCourts = courts.filter((c) => c.status === "AVAILABLE").map((c) => ({ id: c.id, name: c.name }));
-    const initialDate = selectedTournament.startDate ?? todayZonedDateKey();
+    const initialDate = selectedTournament.startDate ?? todayZonedDateKey(selectedTournament.clubTimeZone);
 
     return (
       <div className="flex flex-col gap-6">
@@ -115,7 +115,13 @@ export default async function PartidosPage({
             ))}
           </div>
         )}
-        <SchedulerBoardLoader tournamentId={selectedTournament.id} matches={matches} courts={availableCourts} initialDate={initialDate} />
+        <SchedulerBoardLoader
+          tournamentId={selectedTournament.id}
+          matches={matches}
+          courts={availableCourts}
+          initialDate={initialDate}
+          clubTimeZone={selectedTournament.clubTimeZone}
+        />
       </div>
     );
   }

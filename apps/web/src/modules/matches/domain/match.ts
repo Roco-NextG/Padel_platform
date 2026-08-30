@@ -26,6 +26,8 @@ export interface MatchListItem {
   tournamentName: string;
   /** Club donde se organiza el torneo — necesario para cuentas Organizador, que operan en varios clubes distintos. */
   clubName: string;
+  /** Zona horaria del club donde se juega ESTE partido — nunca la del que mira la pantalla, un torneo alojado en otra sede se muestra en su propia hora local. */
+  clubTimeZone: string;
   categoryName: string;
   phaseLabel: string;
   groupName: string | null;
@@ -40,6 +42,8 @@ export interface MatchListItem {
   teamB: MatchTeamView | null;
   winnerTeamId: string | null;
   scoringConfig: ScoringConfig;
+  /** Sets ya registrados en `set_scores` — vacío si el partido todavía no tiene marcador cargado. */
+  sets: SetScoreInput[];
 }
 
 const STATUS_LABELS: Record<MatchStatus, string> = {
