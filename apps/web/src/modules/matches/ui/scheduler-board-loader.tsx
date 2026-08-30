@@ -20,5 +20,11 @@ export function SchedulerBoardLoader(props: {
   courts: { id: string; name: string }[];
   initialDate: string;
 }) {
-  return <SchedulerBoard {...props} />;
+  // key=tournamentId fuerza el remount al cambiar de torneo — SchedulerBoard
+  // guarda matches/fecha/categoría en useState propio; sin esto, cambiar de
+  // torneo por el selector de pills solo cambia las props pero el
+  // componente sigue montado con su estado viejo (mismo bug que
+  // CategoryGrid antes de su fix: confirmado en vivo, la grilla quedaba
+  // vacía y el filtro de categoría mostraba una del torneo anterior).
+  return <SchedulerBoard key={props.tournamentId} {...props} />;
 }

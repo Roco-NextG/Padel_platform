@@ -24,6 +24,8 @@ export interface MatchListItem {
   id: string;
   tournamentId: string;
   tournamentName: string;
+  /** Club donde se organiza el torneo — necesario para cuentas Organizador, que operan en varios clubes distintos. */
+  clubName: string;
   categoryName: string;
   phaseLabel: string;
   groupName: string | null;

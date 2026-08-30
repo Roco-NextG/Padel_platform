@@ -10,13 +10,9 @@ import { MatchList } from "@/modules/matches/ui/match-list";
 import { SchedulerBoardLoader } from "@/modules/matches/ui/scheduler-board-loader";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CalendarBlank, Radio, CalendarDots } from "@phosphor-icons/react/dist/ssr";
+import { todayZonedDateKey } from "@/lib/timezone";
 
 export const metadata: Metadata = { title: "Partidos — Padel Platform" };
-
-function todayDateKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 export default async function PartidosPage({
   searchParams,
@@ -91,7 +87,7 @@ export default async function PartidosPage({
       fetchClubCourts(selectedTournament.clubId),
     ]);
     const availableCourts = courts.filter((c) => c.status === "AVAILABLE").map((c) => ({ id: c.id, name: c.name }));
-    const initialDate = selectedTournament.startDate ?? todayDateKey();
+    const initialDate = selectedTournament.startDate ?? todayZonedDateKey();
 
     return (
       <div className="flex flex-col gap-6">

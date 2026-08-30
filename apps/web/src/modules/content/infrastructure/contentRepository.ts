@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { formatZonedDate, formatZonedTime, zonedDateKey } from "@/lib/timezone";
 import { initialsFor, type ContentItem, type ContentTeam } from "../domain/content";
 
 interface RawTeamMember {
@@ -13,17 +14,18 @@ function teamFromMembers(members: RawTeamMember[] | null | undefined): ContentTe
   return { label, initials: initialsFor(label) };
 }
 
+/** zonedDateKey (no un slice de string) — un partido a las 23:30 en América/Caracas queda guardado como 03:30 UTC del día siguiente; agrupar por el string UTC crudo lo metía en el día equivocado. */
 function dateKeyOf(iso: string): string {
-  return iso.slice(0, 10);
+  return zonedDateKey(iso);
 }
 
 function dateLabelOf(iso: string): string {
-  return new Date(iso).toLocaleDateString("es-VE", { weekday: "short", day: "numeric", month: "short" }).toUpperCase();
+  return formatZonedDate(iso, { weekday: "short", day: "numeric", month: "short" }).toUpperCase();
 }
 
 function timeLabelOf(iso: string | null): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" });
+  return formatZonedTime(iso);
 }
 
 const CONTENT_MATCH_SELECT = `
