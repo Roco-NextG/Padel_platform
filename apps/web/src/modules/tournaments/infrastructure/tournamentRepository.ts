@@ -15,7 +15,9 @@ export async function fetchMyTournaments(account: ClubSurfaceAccount): Promise<T
   const supabase = await createClient();
   let query = supabase
     .from("tournaments")
-    .select("id, name, description, club_id, organizer_id, status, is_published, start_date, end_date, created_at, clubs(name, time_zone)")
+    .select(
+      "id, name, description, club_id, organizer_id, status, is_published, start_date, end_date, created_at, logo_url, cover_image_url, clubs(name, time_zone)"
+    )
     .order("created_at", { ascending: false });
 
   query = account.role === "Club" ? query.eq("club_id", account.clubId!).is("organizer_id", null) : query.eq("organizer_id", account.organizerId!);
@@ -61,6 +63,8 @@ export async function fetchMyTournaments(account: ClubSurfaceAccount): Promise<T
     categoryCount: categoryCountByTournament.get(t.id) ?? 0,
     teamCount: teamCountByTournament.get(t.id) ?? 0,
     createdAt: t.created_at,
+    logoUrl: t.logo_url,
+    coverImageUrl: t.cover_image_url,
   }));
 }
 
@@ -68,7 +72,9 @@ export async function fetchTournamentById(tournamentId: string): Promise<Tournam
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id, name, description, club_id, organizer_id, status, is_published, start_date, end_date, created_at, clubs(name, time_zone)")
+    .select(
+      "id, name, description, club_id, organizer_id, status, is_published, start_date, end_date, created_at, logo_url, cover_image_url, clubs(name, time_zone)"
+    )
     .eq("id", tournamentId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -89,6 +95,8 @@ export async function fetchTournamentById(tournamentId: string): Promise<Tournam
     categoryCount: 0,
     teamCount: 0,
     createdAt: data.created_at,
+    logoUrl: data.logo_url,
+    coverImageUrl: data.cover_image_url,
   };
 }
 
@@ -190,6 +198,37 @@ export async function removeCategory(categoryId: string): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("tournament_categories").delete().eq("id", categoryId);
   if (error) throw new Error(error.message);
+}
+
+async function uploadTournamentBranding(tournamentId: string, file: File, prefix: "logo" | "cover"): Promise<string> {
+  const supabase = await createClient();
+  const ext = file.name.split(".").pop() ?? "png";
+  const path = `${tournamentId}/${prefix}-${crypto.randomUUID()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage.from("tournament-branding").upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  });
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { data } = supabase.storage.from("tournament-branding").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+export async function uploadTournamentLogo(tournamentId: string, file: File): Promise<string> {
+  const url = await uploadTournamentBranding(tournamentId, file, "logo");
+  const supabase = await createClient();
+  const { error } = await supabase.from("tournaments").update({ logo_url: url }).eq("id", tournamentId);
+  if (error) throw new Error(error.message);
+  return url;
+}
+
+export async function uploadTournamentCoverImage(tournamentId: string, file: File): Promise<string> {
+  const url = await uploadTournamentBranding(tournamentId, file, "cover");
+  const supabase = await createClient();
+  const { error } = await supabase.from("tournaments").update({ cover_image_url: url }).eq("id", tournamentId);
+  if (error) throw new Error(error.message);
+  return url;
 }
 
 /** REGISTRATION_OPEN al publicar (no PUBLISHED a secas) — al publicar, las inscripciones ya construidas en el wizard quedan abiertas de una, no hace falta un paso más para eso. */

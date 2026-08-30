@@ -30,11 +30,23 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
         {/* Link "estirado" cubriendo toda la card (comportamiento de antes) — el botón "Ver cuadro" se dibuja encima con z-index mayor, así no hace falta anidar <a>. */}
         <Link href={editPath} className="absolute inset-0 z-0" aria-label={`Editar ${tournament.name}`} />
 
-        <div className="relative z-[1] h-[76px] shrink-0 bg-inverse bg-[radial-gradient(circle_at_30%_0%,var(--color-accent-muted),transparent_70%)]">
+        <div
+          className="relative z-[1] h-[76px] shrink-0 bg-inverse bg-[radial-gradient(circle_at_30%_0%,var(--color-accent-muted),transparent_70%)] bg-cover bg-center"
+          style={tournament.coverImageUrl ? { backgroundImage: `url(${tournament.coverImageUrl})` } : undefined}
+        >
           <Badge tone={CARD_STATUS_TONE[status]} className="absolute right-2.5 top-2.5">
             {CARD_STATUS_LABELS[status]}
           </Badge>
-          <Trophy className="absolute bottom-2.5 left-3 size-5 text-inverse-foreground/70" weight="fill" />
+          {tournament.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={tournament.logoUrl}
+              alt=""
+              className="absolute bottom-2.5 left-3 size-6 rounded-full border-2 border-background object-cover"
+            />
+          ) : (
+            <Trophy className="absolute bottom-2.5 left-3 size-5 text-inverse-foreground/70" weight="fill" />
+          )}
         </div>
         <div className="relative z-[1] flex flex-1 flex-col gap-3 px-4 pb-4">
           <div className="flex flex-col gap-1">
