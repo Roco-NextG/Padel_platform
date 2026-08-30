@@ -5,6 +5,7 @@ import { DndContext, useDraggable, useDroppable, type DragEndEvent } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { CaretLeft, CaretRight, X } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { zonedDateKey, zonedSlotToIso, zonedTimeKey, shiftZonedDateKey } from "@/lib/timezone";
 import { scheduleMatchAction, unscheduleMatchAction } from "../application/matchActions";
 import { matchTeamLabel, type MatchListItem } from "../domain/match";
 
@@ -21,21 +22,6 @@ function buildTimeSlots(): string[] {
   return slots;
 }
 const TIME_SLOTS = buildTimeSlots();
-
-function localDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-function localTimeKey(d: Date): string {
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-function slotToIso(dateKey: string, time: string): string {
-  return new Date(`${dateKey}T${time}:00`).toISOString();
-}
-function shiftDateKey(dateKey: string, days: number): string {
-  const d = new Date(`${dateKey}T00:00:00`);
-  d.setDate(d.getDate() + days);
-  return localDateKey(d);
-}
 
 const LOCKED_STATUSES = new Set<MatchListItem["status"]>(["IN_PROGRESS", "PENDING_CONFIRMATION", "CONFIRMED", "DISPUTED", "CANCELLED"]);
 
@@ -167,9 +153,8 @@ export function SchedulerBoard({
     for (const m of matches) {
       if (!m.scheduledStart || !m.courtId) continue;
       if (categoryFilter !== "Todas" && m.categoryName !== categoryFilter) continue;
-      const d = new Date(m.scheduledStart);
-      if (localDateKey(d) !== selectedDate) continue;
-      map.set(`${m.courtId}:${localTimeKey(d)}`, m);
+      if (zonedDateKey(m.scheduledStart) !== selectedDate) continue;
+      map.set(`${m.courtId}:${zonedTimeKey(m.scheduledStart)}`, m);
     }
     return map;
   }, [matches, selectedDate, categoryFilter]);
@@ -208,7 +193,7 @@ export function SchedulerBoard({
     const [, courtId, time] = overId.split(":");
     if (!courtId || !time) return;
 
-    const scheduledStartIso = slotToIso(selectedDate, time);
+    const scheduledStartIso = zonedSlotToIso(selectedDate, time);
     const scheduledEnd = new Date(new Date(scheduledStartIso).getTime() + 90 * 60_000).toISOString();
     const conflict = matches.some(
       (m) =>
@@ -244,7 +229,7 @@ export function SchedulerBoard({
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setSelectedDate((d) => shiftDateKey(d, -1))}
+              onClick={() => setSelectedDate((d) => shiftZonedDateKey(d, -1))}
               className="flex size-8 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground hover:bg-surface-secondary"
               aria-label="Día anterior"
             >
@@ -258,7 +243,7 @@ export function SchedulerBoard({
             />
             <button
               type="button"
-              onClick={() => setSelectedDate((d) => shiftDateKey(d, 1))}
+              onClick={() => setSelectedDate((d) => shiftZonedDateKey(d, 1))}
               className="flex size-8 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground hover:bg-surface-secondary"
               aria-label="Día siguiente"
             >

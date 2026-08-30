@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { cancelMatchAction, pauseMatchAction, resumeMatchAction, setMatchCourtAction, startMatchAction } from "../application/matchActions";
 import { MatchScoreboard } from "./match-scoreboard";
 import { MATCH_DISPLAY_STATUS_META, matchDisplayStatus, type MatchListItem } from "../domain/match";
+import { formatZonedTime } from "@/lib/timezone";
 
 /** Borde/sombra por estado visual — mismo criterio que .match-card en padel-platform.html (live=glow, paused/disputed=borde izquierdo de color, cancelled=atenuado). */
 const CARD_TREATMENT: Record<string, string> = {
@@ -19,16 +20,9 @@ const CARD_TREATMENT: Record<string, string> = {
   CANCELLED: "opacity-60 grayscale-[0.4]",
 };
 
-/**
- * timeZone fijo (no el del entorno) — este es un Client Component, así que
- * React hidrata: si el servidor (Vercel, UTC) y el navegador del usuario
- * calculan la hora en zonas distintas, el texto no coincide entre el SSR y
- * el cliente y React tira el error de hidratación #418. Fijarla acá hace
- * que ambos lados computen exactamente lo mismo sin importar dónde corran.
- */
 function formatTime(iso: string | null): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit", timeZone: "America/Caracas" });
+  return formatZonedTime(iso);
 }
 
 export function MatchCard({

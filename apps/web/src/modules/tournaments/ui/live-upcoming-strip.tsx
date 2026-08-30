@@ -1,4 +1,5 @@
 import { matchTeamShortLabel, type MatchListItem } from "@/modules/matches/domain/match";
+import { formatZonedTime } from "@/lib/timezone";
 
 /** Anatomía calcada de .live-strip/.live-chip/.up-chip (padel-platform.html) — acotado a la categoría seleccionada del Cuadro. */
 export function LiveUpcomingStrip({ matches }: { matches: MatchListItem[] }) {
@@ -39,9 +40,7 @@ export function LiveUpcomingStrip({ matches }: { matches: MatchListItem[] }) {
             {upcoming.map((m) => (
               <div key={m.id} className="flex shrink-0 flex-col gap-0.5 rounded-lg bg-surface-secondary px-3 py-1.5">
                 <span className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
-                  {m.scheduledStart
-                    ? new Date(m.scheduledStart).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit", timeZone: "America/Caracas" })
-                    : ""}
+                  {m.scheduledStart ? formatZonedTime(m.scheduledStart) : ""}
                   {m.courtName ? ` · ${m.courtName}` : ""}
                 </span>
                 <span className="text-xs font-medium text-foreground">

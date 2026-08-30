@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CaretRight, CheckCircle } from "@phosphor-icons/react/dist/ssr";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { formatZonedTime } from "@/lib/timezone";
 import { matchStatusLabel, matchTeamLabel, type MatchListItem } from "@/modules/matches/domain/match";
 import type { RecentResult } from "@/modules/matches/infrastructure/matchRepository";
 import type { Court } from "@/modules/courts/domain/court";
@@ -34,7 +35,7 @@ function Stat({ num, label }: { num: number; label: string }) {
   );
 }
 
-export function UpcomingMatches({ matches }: { matches: MatchListItem[] }) {
+export function UpcomingMatches({ matches, showClubName }: { matches: MatchListItem[]; showClubName: boolean }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
@@ -47,7 +48,7 @@ export function UpcomingMatches({ matches }: { matches: MatchListItem[] }) {
         {matches.length === 0 ? (
           <p className="p-5 text-sm text-muted-foreground">Sin partidos programados todavía.</p>
         ) : (
-          matches.slice(0, 6).map((m) => <MatchRow key={m.id} match={m} />)
+          matches.slice(0, 6).map((m) => <MatchRow key={m.id} match={m} showClubName={showClubName} />)
         )}
       </Card>
     </div>
@@ -61,10 +62,8 @@ const STATUS_PILL_CLASSES: Record<string, string> = {
   SCHEDULED: "bg-surface-secondary text-muted-foreground",
 };
 
-function MatchRow({ match }: { match: MatchListItem }) {
-  const time = match.scheduledStart
-    ? new Date(match.scheduledStart).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })
-    : "--:--";
+function MatchRow({ match, showClubName }: { match: MatchListItem; showClubName: boolean }) {
+  const time = match.scheduledStart ? formatZonedTime(match.scheduledStart) : "--:--";
 
   return (
     <div className="flex items-center gap-4 border-b border-border px-4 py-3.5 last:border-0">
@@ -74,10 +73,16 @@ function MatchRow({ match }: { match: MatchListItem }) {
           {(match.courtName ?? "SIN PISTA").toUpperCase()}
         </div>
       </div>
-      <div className="flex min-w-0 flex-1 items-center justify-center gap-3">
-        <span className="line-clamp-2 text-center text-[13px] font-medium text-foreground">{matchTeamLabel(match.teamA)}</span>
-        <span className="shrink-0 text-[11px] text-foreground-tertiary">vs</span>
-        <span className="line-clamp-2 text-center text-[13px] font-medium text-foreground">{matchTeamLabel(match.teamB)}</span>
+      <div className="flex min-w-0 flex-1 flex-col items-center gap-0.5">
+        <div className="flex items-center gap-3">
+          <span className="line-clamp-2 text-center text-[13px] font-medium text-foreground">{matchTeamLabel(match.teamA)}</span>
+          <span className="shrink-0 text-[11px] text-foreground-tertiary">vs</span>
+          <span className="line-clamp-2 text-center text-[13px] font-medium text-foreground">{matchTeamLabel(match.teamB)}</span>
+        </div>
+        <span className="truncate text-[10.5px] text-muted-foreground">
+          {match.tournamentName}
+          {showClubName ? ` · ${match.clubName}` : ""}
+        </span>
       </div>
       <span className={cn("flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-medium", STATUS_PILL_CLASSES[match.status] ?? "bg-surface-secondary text-muted-foreground")}>
         {match.status === "IN_PROGRESS" && <span className="size-1.5 rounded-full bg-accent-strong" />}
@@ -87,10 +92,37 @@ function MatchRow({ match }: { match: MatchListItem }) {
   );
 }
 
-export function CourtStatusCard({ courts, busyCourtIds }: { courts: Court[]; busyCourtIds: Set<string> }) {
+export function CourtStatusCard({
+  courts,
+  busyCourtIds,
+  clubSelector,
+}: {
+  courts: Court[];
+  busyCourtIds: Set<string>;
+  /** Solo para cuentas Organizador con más de un club anfitrión — Club siempre mira su propio club, sin selector. */
+  clubSelector?: { clubs: { clubId: string; clubName: string }[]; selectedClubId: string; basePath: string };
+}) {
   return (
     <Card className="flex flex-col gap-3 p-4">
       <h3 className="text-sm font-medium text-foreground">Estado de pistas</h3>
+      {clubSelector && (
+        <div className="flex flex-wrap gap-1.5">
+          {clubSelector.clubs.map((c) => (
+            <Link
+              key={c.clubId}
+              href={`${clubSelector.basePath}?pistaClub=${c.clubId}`}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                c.clubId === clubSelector.selectedClubId
+                  ? "border-accent bg-accent-muted text-accent-text"
+                  : "border-border-strong text-muted-foreground hover:bg-surface-secondary"
+              )}
+            >
+              {c.clubName}
+            </Link>
+          ))}
+        </div>
+      )}
       <div className="grid grid-cols-6 gap-2">
         {courts.map((c) => (
           <div

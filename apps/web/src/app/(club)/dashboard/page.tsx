@@ -10,10 +10,12 @@ import { fetchClubCourts } from "@/modules/courts/infrastructure/courtRepository
 import { LiveBand, UpcomingMatches, CourtStatusCard, RecentResultsCard } from "@/modules/dashboard/ui/dashboard-sections";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { formatZonedDate } from "@/lib/timezone";
 
 export const metadata: Metadata = { title: "Dashboard — Padel Platform" };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ pistaClub?: string }> }) {
+  const { pistaClub } = await searchParams;
   const context = await getCurrentUserContext();
   if (!context) redirect("/login");
 
@@ -31,12 +33,19 @@ export default async function DashboardPage() {
     );
   }
 
-  const [matches, tournaments, recentResults, courts] = await Promise.all([
+  const [matches, tournaments, recentResults] = await Promise.all([
     fetchManagedMatches(account),
     fetchMyTournaments(account),
     fetchRecentResults(account, 3),
-    account.role === "Club" ? fetchClubCourts(account.clubId!) : Promise.resolve([]),
   ]);
+
+  // Un Organizador aloja torneos en clubes distintos — a diferencia de una cuenta Club (siempre su propio club), acá hace falta elegir de cuál club mirar el estado de pistas.
+  const hostClubs =
+    account.role === "Organizador"
+      ? [...new Map(tournaments.map((t) => [t.clubId, t.clubName])).entries()].map(([clubId, clubName]) => ({ clubId, clubName }))
+      : [];
+  const selectedClubId = account.role === "Club" ? account.clubId! : (pistaClub ?? hostClubs[0]?.clubId ?? null);
+  const courts = selectedClubId ? await fetchClubCourts(selectedClubId) : [];
 
   if (tournaments.length === 0) {
     return (
@@ -64,7 +73,7 @@ export default async function DashboardPage() {
   const scheduled = matches.filter((m) => m.status === "SCHEDULED");
   const busyCourtIds = new Set(inProgress.map((m) => m.courtId).filter((id): id is string => id !== null));
 
-  const today = new Date().toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" });
+  const today = formatZonedDate(new Date().toISOString(), { weekday: "long", day: "numeric", month: "long" });
   const firstName = account.contactName.split(" ")[0];
 
   return (
@@ -92,9 +101,19 @@ export default async function DashboardPage() {
       <LiveBand inProgress={inProgress.length} pending={pending.length} scheduled={scheduled.length} />
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_360px]">
-        <UpcomingMatches matches={matches} />
+        <UpcomingMatches matches={matches} showClubName={account.role === "Organizador"} />
         <div className="flex flex-col gap-4">
-          {account.role === "Club" && courts.length > 0 && <CourtStatusCard courts={courts} busyCourtIds={busyCourtIds} />}
+          {courts.length > 0 && (
+            <CourtStatusCard
+              courts={courts}
+              busyCourtIds={busyCourtIds}
+              clubSelector={
+                hostClubs.length > 1 && selectedClubId
+                  ? { clubs: hostClubs, selectedClubId, basePath: "/dashboard" }
+                  : undefined
+              }
+            />
+          )}
           <RecentResultsCard results={recentResults} />
         </div>
       </div>

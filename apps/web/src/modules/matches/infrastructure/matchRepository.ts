@@ -21,7 +21,7 @@ function toTeamView(teamId: string | null, members: RawTeamMember[] | null | und
 const MATCH_LIST_SELECT = `
   id, tournament_id, phase_id, group_id, court_id, status, is_paused, scheduled_start, scheduled_end, actual_start,
   team_a_id, team_b_id, winner_team_id,
-  tournaments(name, scoring_config),
+  tournaments(name, scoring_config, clubs(name)),
   tournament_phases(type, category_id, tournament_categories(name)),
   tournament_groups(name),
   courts(name),
@@ -92,6 +92,7 @@ function mapMatchRows(rows: any[] | null): MatchListItem[] {
     id: m.id,
     tournamentId: m.tournament_id,
     tournamentName: m.tournaments?.name ?? "?",
+    clubName: m.tournaments?.clubs?.name ?? "?",
     categoryName: m.tournament_phases?.tournament_categories?.name ?? "?",
     phaseLabel: m.tournament_phases?.type ?? "?",
     groupName: m.tournament_groups?.name ?? null,
