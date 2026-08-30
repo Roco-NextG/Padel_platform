@@ -18,7 +18,12 @@ export interface Tournament {
   categoryCount: number;
   teamCount: number;
   createdAt: string;
+  logoUrl: string | null;
+  coverImageUrl: string | null;
 }
+
+export const MAX_BRANDING_BYTES = 3 * 1024 * 1024;
+export const ALLOWED_BRANDING_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 const STATUS_LABELS: Record<TournamentStatus, string> = {
   DRAFT: "Borrador",
