@@ -19,10 +19,12 @@ function CategoryFilter({
   categories,
   active,
   onChange,
+  layoutId,
 }: {
   categories: number[];
   active: number | null;
   onChange: (c: number | null) => void;
+  layoutId: string;
 }) {
   return (
     <div className="inline-flex gap-1 rounded-full border border-border bg-surface-secondary p-1">
@@ -30,11 +32,14 @@ function CategoryFilter({
         type="button"
         onClick={() => onChange(null)}
         className={cn(
-          "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-          active === null ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+          "relative rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+          active === null ? "text-foreground" : "text-muted-foreground hover:text-foreground"
         )}
       >
-        Todas
+        {active === null && (
+          <motion.span layoutId={layoutId} className="absolute inset-0 rounded-full bg-surface shadow-sm" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
+        )}
+        <span className="relative">Todas</span>
       </button>
       {categories.map((c) => (
         <button
@@ -42,11 +47,14 @@ function CategoryFilter({
           type="button"
           onClick={() => onChange(c)}
           className={cn(
-            "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-            active === c ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            "relative rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+            active === c ? "text-foreground" : "text-muted-foreground hover:text-foreground"
           )}
         >
-          Cat. {c}
+          {active === c && (
+            <motion.span layoutId={layoutId} className="absolute inset-0 rounded-full bg-surface shadow-sm" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
+          )}
+          <span className="relative">Cat. {c}</span>
         </button>
       ))}
     </div>
@@ -63,6 +71,9 @@ function TrendIndicator({ trend, delta }: { trend: PlayerRankingItem["trend"]; d
     </span>
   );
 }
+
+/** Orden visual del podio: 2º-izquierda, 1º-centro (elevado), 3º-derecha — igual que padel-platform.html. */
+const PODIUM_ORDER = ["order-2 sm:order-1", "order-1 sm:order-2", "order-3"];
 
 function RankingTab({ players }: { players: PlayerRankingItem[] }) {
   const [category, setCategory] = useState<number | null>(null);
@@ -87,31 +98,37 @@ function RankingTab({ players }: { players: PlayerRankingItem[] }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <CategoryFilter categories={categories} active={category} onChange={setCategory} />
+        <CategoryFilter categories={categories} active={category} onChange={setCategory} layoutId="rank-category-active" />
         <span className="text-xs text-muted-foreground">{filtered.length} {filtered.length === 1 ? "jugador" : "jugadores"}</span>
       </div>
 
       {podium.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {podium.map((p, i) => (
-            <motion.div
-              key={p.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className={cn(
-                "flex flex-col items-center gap-2 rounded-lg border p-4 text-center",
-                i === 0 ? "border-accent shadow-glow" : "border-border bg-surface"
-              )}
-            >
-              <span className="text-xs font-semibold text-muted-foreground">#{i + 1}</span>
-              <Avatar name={playerName(p)} className={cn(i === 0 ? "size-14 text-base" : "size-11 text-sm")} />
-              <span className="text-sm font-medium text-foreground">{playerName(p)}</span>
-              <span className="text-xs text-muted-foreground">{p.category ? `Cat. ${p.category}` : "Sin categoría"}</span>
-              <span className="font-display text-xl font-semibold tabular-nums text-foreground">{p.rating?.toFixed(2)}</span>
-              <TrendIndicator trend={p.trend} delta={p.trendDelta} />
-            </motion.div>
-          ))}
+        <div className="flex flex-wrap items-end justify-center gap-3">
+          {podium.map((p, i) => {
+            const first = i === 0;
+            return (
+              <motion.div
+                key={p.id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.06, type: "spring", stiffness: 300, damping: 28 }}
+                className={cn(
+                  "flex w-40 flex-col items-center gap-2 rounded-lg border text-center",
+                  first ? "border-transparent pb-5 pt-6 shadow-glow" : "border-border bg-surface pb-4 pt-4",
+                  PODIUM_ORDER[i]
+                )}
+              >
+                <span className={cn("text-[11px] font-bold tracking-wide", first ? "text-accent-text" : "text-muted-foreground")}>#{i + 1}</span>
+                <Avatar name={playerName(p)} className={cn(first ? "size-16 text-lg ring-[3px] ring-accent-tint" : "size-[52px] text-sm")} />
+                <span className="text-sm font-semibold text-foreground">{playerName(p)}</span>
+                <span className="text-[11px] text-muted-foreground">{p.category ? `Cat. ${p.category}` : "Sin categoría"}</span>
+                <span className={cn("font-display font-semibold tabular-nums text-foreground", first ? "text-3xl" : "text-2xl")}>
+                  {p.rating?.toFixed(2)}
+                </span>
+                <TrendIndicator trend={p.trend} delta={p.trendDelta} />
+              </motion.div>
+            );
+          })}
         </div>
       )}
 
@@ -120,22 +137,28 @@ function RankingTab({ players }: { players: PlayerRankingItem[] }) {
           {rest.map((p, i) => {
             const confidence = confidenceFromRD(p.ratingDeviation);
             return (
-              <div key={p.id} className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-0">
+              <motion.div
+                key={p.id}
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(i, 8) * 0.02 }}
+                className="flex items-center gap-3 border-b border-border px-4 py-3 transition-colors last:border-0 hover:bg-surface-secondary"
+              >
                 <span className="w-6 shrink-0 text-xs text-muted-foreground">{i + 4}</span>
                 <Avatar name={playerName(p)} className="size-8 text-xs" />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-medium text-foreground">{playerName(p)}</span>
                   <span className="text-xs text-muted-foreground">{p.category ? `Cat. ${p.category}` : "Sin categoría"}</span>
                 </div>
-                <Sparkline values={p.ratingHistory} className="hidden shrink-0 text-muted-foreground sm:block" />
+                <Sparkline values={p.ratingHistory} tone={p.trend} className="hidden shrink-0 text-muted-foreground sm:block" />
                 <TrendIndicator trend={p.trend} delta={p.trendDelta} />
                 <span className="w-14 shrink-0 text-right font-display text-sm font-semibold tabular-nums text-foreground">
                   {p.rating?.toFixed(2)}
                 </span>
-                <Badge tone={CONFIDENCE_TONE[confidence]} className="hidden shrink-0 sm:inline-flex">
+                <Badge tone={CONFIDENCE_TONE[confidence]} className="hidden w-16 shrink-0 justify-center sm:inline-flex">
                   {confidence}
                 </Badge>
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -165,7 +188,7 @@ function JugadoresTab({ players }: { players: VisiblePlayer[] }) {
           <MagnifyingGlass className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar jugador..." className="pl-9" />
         </div>
-        <CategoryFilter categories={categories} active={category} onChange={setCategory} />
+        <CategoryFilter categories={categories} active={category} onChange={setCategory} layoutId="jug-category-active" />
         <span className="ml-auto text-xs text-muted-foreground">{filtered.length} {filtered.length === 1 ? "jugador" : "jugadores"}</span>
       </div>
 
@@ -182,7 +205,7 @@ function JugadoresTab({ players }: { players: VisiblePlayer[] }) {
       ) : (
         <div className="flex max-h-[640px] flex-col overflow-y-auto rounded-lg border border-border bg-surface">
           {filtered.map((p) => (
-            <div key={p.id} className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 last:border-0">
+            <div key={p.id} className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 transition-colors last:border-0 hover:bg-surface-secondary">
               <Avatar name={playerName(p)} className="size-8 text-xs" />
               <div className="flex min-w-[140px] flex-col">
                 <span className="text-sm font-medium text-foreground">{playerName(p)}</span>
@@ -223,11 +246,18 @@ export function PlayersView({ ranking, directory }: { ranking: PlayerRankingItem
             type="button"
             onClick={() => setTab(t)}
             className={cn(
-              "rounded-full px-4 py-1.5 text-sm font-medium capitalize transition-colors",
-              tab === t ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              "relative rounded-full px-4 py-1.5 text-sm font-medium capitalize transition-colors",
+              tab === t ? "text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
-            {t === "ranking" ? "Ranking" : "Jugadores"}
+            {tab === t && (
+              <motion.span
+                layoutId="players-tab-active"
+                className="absolute inset-0 rounded-full bg-surface shadow-sm"
+                transition={{ type: "spring", stiffness: 420, damping: 34 }}
+              />
+            )}
+            <span className="relative">{t === "ranking" ? "Ranking" : "Jugadores"}</span>
           </button>
         ))}
       </div>
