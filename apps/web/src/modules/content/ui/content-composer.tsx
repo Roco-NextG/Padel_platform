@@ -89,7 +89,14 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
   function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadUrl(URL.createObjectURL(file));
+    // data: URL, no un blob: object URL — html2canvas se queda colgado indefinidamente
+    // tratando de re-fetchear una imagen blob: (confirmado en vivo: el log se detiene en
+    // "Added image blob:..." y el export nunca resuelve), porque su loader interno intenta
+    // pasarla por el mismo camino de proxy/CORS que usa para imágenes remotas. Un data: URL
+    // ya viene embebido, sin fetch de por medio, así que ese camino nunca se dispara.
+    const reader = new FileReader();
+    reader.onload = () => setUploadUrl(reader.result as string);
+    reader.readAsDataURL(file);
     setBackground("upload");
   }
 
@@ -133,17 +140,29 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
   }
 
   function handleCopySticker() {
-    withNode(async (node) => {
-      const blob = await captureNode(node, null);
-      if (!blob) return;
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await navigator.clipboard.write([new (window as any).ClipboardItem({ "image/png": blob })]);
-        setToast("Sticker copiado al portapapeles.");
-      } catch {
-        setToast("Tu navegador no soporta copiar imágenes — probá descargar.");
-      }
+    if (!slideRef.current) return;
+    // navigator.clipboard.write() tiene que llamarse de forma SÍNCRONA dentro del handler del
+    // click para que el navegador todavía lo cuente como "gesto del usuario" (confirmado: la
+    // versión anterior hacía `await captureNode(...)` ANTES de llamar a .write(), y para
+    // cuando esa promesa resolvía el navegador ya había perdido esa ventana — .write() fallaba
+    // silenciosamente, o el catch mostraba "no soporta copiar imágenes" aunque sí soporte). El
+    // Blob en sí puede seguir generándose async — ClipboardItem acepta una Promise<Blob> como
+    // valor exactamente para este caso.
+    const node = slideRef.current;
+    setIsExporting(true);
+    const blobPromise = captureNode(node, null).then((blob) => {
+      if (!blob) throw new Error("No se pudo generar la imagen.");
+      return blob;
     });
+    navigator.clipboard
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .write([new (window as any).ClipboardItem({ "image/png": blobPromise })])
+      .then(() => setToast("Sticker copiado al portapapeles."))
+      .catch(() => setToast("Tu navegador no soporta copiar imágenes — probá descargar."))
+      .finally(() => {
+        setIsExporting(false);
+        setTimeout(() => setToast(null), 3000);
+      });
   }
 
   if (feed.items.length === 0) {
