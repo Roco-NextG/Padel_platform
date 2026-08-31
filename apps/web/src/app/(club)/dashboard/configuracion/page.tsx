@@ -5,6 +5,7 @@ import { fetchClubSurfaceAccount } from "@/modules/shell/infrastructure/accountR
 import { fetchClubCourts } from "@/modules/courts/infrastructure/courtRepository";
 import { CourtsManager } from "@/modules/courts/ui/courts-manager";
 import { TimeZoneSelector } from "@/modules/shell/ui/timezone-selector";
+import { ProfileForm } from "@/modules/shell/ui/profile-form";
 import { listTimeZones } from "@/lib/timezone";
 import { Card } from "@/components/ui/card";
 
@@ -31,6 +32,20 @@ export default async function ConfiguracionPage() {
         <p className="text-sm text-muted-foreground">
           {account.name} · {account.role}
         </p>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-sm font-medium text-foreground">{account.role === "Club" ? "Datos del club" : "Datos del organizador"}</h2>
+          <p className="text-xs text-muted-foreground">
+            {account.role === "Club"
+              ? "Esta información aparece en tus torneos y es la que usan los jugadores para contactarte."
+              : "Tus datos de contacto — visibles para los clubes que te alojen un torneo."}
+          </p>
+        </div>
+        <Card>
+          <ProfileForm account={account} />
+        </Card>
       </div>
 
       <div className="flex flex-col gap-3">
