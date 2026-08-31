@@ -45,7 +45,20 @@ function itemPreviewLabel(item: ContentItem): string {
 
 async function captureNode(node: HTMLElement, background: string | null): Promise<Blob | null> {
   const { default: html2canvas } = await import("html2canvas");
-  const canvas = await html2canvas(node, { backgroundColor: background, scale: 2, useCORS: true });
+  const canvas = await html2canvas(node, {
+    backgroundColor: background,
+    scale: 2,
+    useCORS: true,
+    // Por default html2canvas clona el <html> ENTERO antes de renderizar (para preservar
+    // cascada/CSS con precisión) — en esta app eso significa clonar y calcularle estilos a todo
+    // el sidebar, el header, y el resto del panel de Contenido, no solo el slide de 1080x1080
+    // que en realidad hace falta. Confirmado en vivo contra producción: ese paso completo tomó
+    // desde ~150ms hasta varios MINUTOS según cuánto more contenido tuviera la página — el
+    // usuario lo veía como "no se pudo descargar". ignoreElements poda todo lo que no sea
+    // ancestro/descendiente del nodo a exportar, sin tocar la cascada real (los ancestros se
+    // preservan intactos para que herencia/variables CSS sigan resolviendo bien).
+    ignoreElements: (el) => !(node.contains(el) || el.contains(node)),
+  });
   return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/png"));
 }
 
