@@ -5,6 +5,11 @@ export interface ClubSurfaceAccount {
   name: string;
   /** Nombre de la persona logueada (contact_first_name/last_name) — distinto de `name` (el club/organizador) para el sidebar: workspace = la entidad, profile-card = quién está logueado (padel-platform.html). */
   contactName: string;
+  contactFirstName: string | null;
+  contactLastName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  address: string | null;
   city: string | null;
   role: "Club" | "Organizador";
   clubId: string | null;
@@ -35,13 +40,18 @@ export async function fetchClubSurfaceAccount(userId: string): Promise<ClubSurfa
   if (role.role === "CLUB" && role.club_id) {
     const { data: club } = await supabase
       .from("clubs")
-      .select("name, city, contact_first_name, contact_last_name, time_zone")
+      .select("name, city, contact_first_name, contact_last_name, contact_phone, contact_email, address, time_zone")
       .eq("id", role.club_id)
       .maybeSingle();
     const contactName = [club?.contact_first_name, club?.contact_last_name].filter(Boolean).join(" ");
     return {
       name: club?.name ?? "Club",
       contactName: contactName || (club?.name ?? "Club"),
+      contactFirstName: club?.contact_first_name ?? null,
+      contactLastName: club?.contact_last_name ?? null,
+      contactPhone: club?.contact_phone ?? null,
+      contactEmail: club?.contact_email ?? null,
+      address: club?.address ?? null,
       city: club?.city ?? null,
       role: "Club",
       clubId: role.club_id,
@@ -53,13 +63,18 @@ export async function fetchClubSurfaceAccount(userId: string): Promise<ClubSurfa
   if (role.role === "ORGANIZADOR" && role.organizer_id) {
     const { data: organizer } = await supabase
       .from("organizers")
-      .select("name, city, contact_first_name, contact_last_name, time_zone")
+      .select("name, city, contact_first_name, contact_last_name, contact_phone, contact_email, address, time_zone")
       .eq("id", role.organizer_id)
       .maybeSingle();
     const contactName = [organizer?.contact_first_name, organizer?.contact_last_name].filter(Boolean).join(" ");
     return {
       name: organizer?.name ?? "Organizador",
       contactName: contactName || (organizer?.name ?? "Organizador"),
+      contactFirstName: organizer?.contact_first_name ?? null,
+      contactLastName: organizer?.contact_last_name ?? null,
+      contactPhone: organizer?.contact_phone ?? null,
+      contactEmail: organizer?.contact_email ?? null,
+      address: organizer?.address ?? null,
       city: organizer?.city ?? null,
       role: "Organizador",
       clubId: null,
@@ -81,6 +96,39 @@ export async function updateAccountTimeZone(account: ClubSurfaceAccount, timeZon
   }
   if (account.role === "Organizador" && account.organizerId) {
     const { error } = await supabase.from("organizers").update({ time_zone: timeZone }).eq("id", account.organizerId);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  throw new Error("Esta cuenta no tiene club u organizador asociado.");
+}
+
+export interface ClubProfileInput {
+  name: string;
+  contactFirstName: string | null;
+  contactLastName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  address: string | null;
+}
+
+/** Guarda los datos de perfil (nombre/contacto/teléfono/email/dirección) de la cuenta — usada por Configuración. */
+export async function updateAccountProfile(account: ClubSurfaceAccount, input: ClubProfileInput): Promise<void> {
+  const supabase = await createClient();
+  const patch = {
+    name: input.name,
+    contact_first_name: input.contactFirstName,
+    contact_last_name: input.contactLastName,
+    contact_phone: input.contactPhone,
+    contact_email: input.contactEmail,
+    address: input.address,
+  };
+  if (account.role === "Club" && account.clubId) {
+    const { error } = await supabase.from("clubs").update(patch).eq("id", account.clubId);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  if (account.role === "Organizador" && account.organizerId) {
+    const { error } = await supabase.from("organizers").update(patch).eq("id", account.organizerId);
     if (error) throw new Error(error.message);
     return;
   }

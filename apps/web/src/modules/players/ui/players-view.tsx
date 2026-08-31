@@ -2,18 +2,23 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { TrendUp, TrendDown, Minus, MagnifyingGlass, Phone, EnvelopeSimple, Trophy } from "@phosphor-icons/react";
+import { TrendUp, TrendDown, Minus, MagnifyingGlass, Phone, EnvelopeSimple, Trophy, PencilSimple, Plus } from "@phosphor-icons/react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { Sparkline } from "./sparkline";
+import { PlayerForm } from "./player-form";
+import { createPlayerStandaloneAction, updatePlayerAction } from "../application/playerActions";
 import { confidenceFromRD, playerName, type PlayerRankingItem, type VisiblePlayer } from "../domain/player";
 
 type Tab = "ranking" | "jugadores";
 
 const CONFIDENCE_TONE = { Alta: "accent", Media: "neutral", Baja: "neutral" } as const;
+
+const GENDER_LABEL: Record<string, string> = { MALE: "Masculino", FEMALE: "Femenino", OTHER: "Otro" };
 
 function CategoryFilter({
   categories,
@@ -167,9 +172,68 @@ function RankingTab({ players }: { players: PlayerRankingItem[] }) {
   );
 }
 
-function JugadoresTab({ players }: { players: VisiblePlayer[] }) {
+function PlayerCard({ player, onUpdated }: { player: VisiblePlayer; onUpdated: (p: VisiblePlayer) => void }) {
+  const [editing, setEditing] = useState(false);
+
+  if (editing) {
+    return (
+      <PlayerForm
+        action={updatePlayerAction.bind(null, player.id)}
+        player={player}
+        onSaved={(p) => {
+          onUpdated(p);
+          setEditing(false);
+        }}
+        onCancel={() => setEditing(false)}
+      />
+    );
+  }
+
+  return (
+    <div className="relative flex flex-col gap-3 rounded-lg border border-border bg-surface p-3.5">
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        aria-label="Editar jugador"
+        className="absolute right-3 top-3 flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-surface-secondary hover:text-foreground"
+      >
+        <PencilSimple className="size-3.5" />
+      </button>
+
+      <div className="flex items-center gap-2.5 pr-8">
+        <Avatar name={playerName(player)} className="size-9 shrink-0 text-xs" />
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate text-sm font-medium text-foreground">{playerName(player)}</span>
+          <div className="flex flex-wrap gap-1">
+            <Badge tone="accent" className="px-1.5 py-0 text-[10px]">
+              {player.category ? `Cat. ${player.category}` : "Sin categoría"}
+            </Badge>
+            <Badge tone="neutral" className="px-1.5 py-0 text-[10px]">
+              {player.gender ? (GENDER_LABEL[player.gender] ?? player.gender) : "Sin género"}
+            </Badge>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <Phone className="size-3.5 shrink-0" />
+          {player.phone ?? "Sin teléfono"}
+        </span>
+        <span className="flex items-center gap-1.5 truncate">
+          <EnvelopeSimple className="size-3.5 shrink-0" />
+          {player.email ?? "Sin email"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function JugadoresTab({ players: initialPlayers }: { players: VisiblePlayer[] }) {
+  const [players, setPlayers] = useState(initialPlayers);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<number | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const categories = useMemo(
     () => [...new Set(players.map((p) => p.category).filter((c): c is number => c !== null))].sort((a, b) => a - b),
     [players]
@@ -181,6 +245,10 @@ function JugadoresTab({ players }: { players: VisiblePlayer[] }) {
     return true;
   });
 
+  function handleUpdated(updated: VisiblePlayer) {
+    setPlayers((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -189,8 +257,23 @@ function JugadoresTab({ players }: { players: VisiblePlayer[] }) {
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar jugador..." className="pl-9" />
         </div>
         <CategoryFilter categories={categories} active={category} onChange={setCategory} layoutId="jug-category-active" />
-        <span className="ml-auto text-xs text-muted-foreground">{filtered.length} {filtered.length === 1 ? "jugador" : "jugadores"}</span>
+        <span className="text-xs text-muted-foreground">{filtered.length} {filtered.length === 1 ? "jugador" : "jugadores"}</span>
+        <Button type="button" size="sm" variant="secondary" onClick={() => setShowCreate((v) => !v)} className="ml-auto gap-1.5">
+          <Plus className="size-4" />
+          Nuevo jugador
+        </Button>
       </div>
+
+      {showCreate && (
+        <PlayerForm
+          action={createPlayerStandaloneAction}
+          onSaved={(p) => {
+            setPlayers((prev) => [p, ...prev]);
+            setShowCreate(false);
+          }}
+          onCancel={() => setShowCreate(false)}
+        />
+      )}
 
       {filtered.length === 0 ? (
         <EmptyState
@@ -198,35 +281,14 @@ function JugadoresTab({ players }: { players: VisiblePlayer[] }) {
           title={players.length === 0 ? "Todavía no hay jugadores en tu roster" : "Sin resultados"}
           description={
             players.length === 0
-              ? "Los jugadores aparecen acá apenas los inscribís en un torneo."
+              ? "Creá un jugador nuevo o inscribilo desde un torneo."
               : "Ajustá la búsqueda o el filtro de categoría."
           }
         />
       ) : (
-        <div className="flex max-h-[640px] flex-col overflow-y-auto rounded-lg border border-border bg-surface">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((p) => (
-            <div key={p.id} className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 transition-colors last:border-0 hover:bg-surface-secondary">
-              <Avatar name={playerName(p)} className="size-8 text-xs" />
-              <div className="flex min-w-[140px] flex-col">
-                <span className="text-sm font-medium text-foreground">{playerName(p)}</span>
-                <span className="text-xs text-muted-foreground">{p.category ? `Cat. ${p.category}` : "Sin categoría"}</span>
-              </div>
-              <div className="ml-auto flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                {p.phone && (
-                  <span className="flex items-center gap-1.5">
-                    <Phone className="size-3.5" />
-                    {p.phone}
-                  </span>
-                )}
-                {p.email && (
-                  <span className="flex items-center gap-1.5">
-                    <EnvelopeSimple className="size-3.5" />
-                    {p.email}
-                  </span>
-                )}
-                {!p.phone && !p.email && <span>Sin contacto</span>}
-              </div>
-            </div>
+            <PlayerCard key={p.id} player={p} onUpdated={handleUpdated} />
           ))}
         </div>
       )}

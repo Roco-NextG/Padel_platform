@@ -6,9 +6,9 @@ import { fetchClubSurfaceAccount } from "@/modules/shell/infrastructure/accountR
 import { fetchManagedMatches } from "@/modules/matches/infrastructure/matchRepository";
 import { ClubSidebar } from "@/modules/shell/ui/club-sidebar";
 import { HeaderClock } from "@/modules/shell/ui/header-clock";
+import { SettingsMenu } from "@/modules/shell/ui/settings-menu";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { DEFAULT_TIME_ZONE } from "@/lib/timezone";
+import { DEFAULT_TIME_ZONE, listTimeZones } from "@/lib/timezone";
 
 export default async function ClubLayout({ children }: { children: React.ReactNode }) {
   const context = await getCurrentUserContext();
@@ -31,7 +31,7 @@ export default async function ClubLayout({ children }: { children: React.ReactNo
         <header className="flex items-center justify-end gap-3 pb-3">
           <HeaderClock timeZone={account?.timeZone ?? DEFAULT_TIME_ZONE} />
           <span className="text-sm text-muted-foreground">{context.email}</span>
-          <ThemeToggle />
+          <SettingsMenu currentTimeZone={account?.timeZone ?? DEFAULT_TIME_ZONE} timeZones={listTimeZones()} />
           <form action={signOutAction}>
             <Button type="submit" variant="ghost" size="sm">
               Salir

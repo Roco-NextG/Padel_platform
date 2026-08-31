@@ -42,15 +42,20 @@ export async function createPlayerAction(
   firstName: string,
   lastName: string,
   gender: GenderType,
-  category: number
+  category: number,
+  phone: string,
+  email: string
 ): Promise<CreatePlayerState> {
   const auth = await requireTournamentManager(tournamentId);
   if (!auth.ok) return { error: auth.error, player: null };
   if (!firstName.trim()) return { error: "El nombre es obligatorio.", player: null };
+  if (!lastName.trim()) return { error: "El apellido es obligatorio.", player: null };
+  if (!phone.trim()) return { error: "El teléfono es obligatorio.", player: null };
+  if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) return { error: "El email no es válido.", player: null };
   if (category < 1 || category > 7) return { error: "La categoría debe estar entre 1 y 7.", player: null };
 
   try {
-    const player = await createPlayerForEnrollment(firstName, lastName, gender, category);
+    const player = await createPlayerForEnrollment(firstName, lastName, gender, category, phone.trim(), email.trim());
     return { error: null, player };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo crear el jugador.", player: null };

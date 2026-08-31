@@ -75,6 +75,7 @@ export interface Database {
           contact_last_name: string | null;
           contact_phone: string | null;
           time_zone: string;
+          address: string | null;
           is_active: boolean;
           created_at: string;
           updated_at: string;
@@ -88,6 +89,7 @@ export interface Database {
           contact_last_name?: string | null;
           contact_phone?: string | null;
           time_zone?: string;
+          address?: string | null;
           is_active?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["clubs"]["Insert"]>;
@@ -103,6 +105,7 @@ export interface Database {
           contact_last_name: string | null;
           contact_phone: string | null;
           time_zone: string;
+          address: string | null;
           is_active: boolean;
           created_at: string;
           updated_at: string;
@@ -116,6 +119,7 @@ export interface Database {
           contact_last_name?: string | null;
           contact_phone?: string | null;
           time_zone?: string;
+          address?: string | null;
           is_active?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["organizers"]["Insert"]>;
@@ -147,6 +151,7 @@ export interface Database {
           first_name: string;
           last_name: string;
           phone: string | null;
+          email: string | null;
           is_active: boolean;
           current_rating: number | null;
           current_rating_deviation: number | null;
@@ -160,6 +165,7 @@ export interface Database {
           first_name: string;
           last_name: string;
           phone?: string | null;
+          email?: string | null;
           is_active?: boolean;
           current_rating?: number | null;
           current_rating_deviation?: number | null;
@@ -553,7 +559,37 @@ export interface Database {
         Returns: { player_id: string; first_name: string; last_name: string; email: string | null; gender: GenderType | null; category: number | null }[];
       };
       create_player_for_enrollment: {
-        Args: { p_first_name: string; p_last_name: string; p_gender: GenderType | null; p_category: number };
+        Args: {
+          p_first_name: string;
+          p_last_name: string;
+          p_gender: GenderType | null;
+          p_category: number;
+          p_phone?: string | null;
+          p_email?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["players"]["Row"];
+      };
+      create_player: {
+        Args: {
+          p_first_name: string;
+          p_last_name: string;
+          p_email: string | null;
+          p_phone: string | null;
+          p_category: number;
+          p_gender?: GenderType | null;
+        };
+        Returns: Database["public"]["Tables"]["players"]["Row"];
+      };
+      update_player: {
+        Args: {
+          p_player_id: string;
+          p_first_name: string;
+          p_last_name: string;
+          p_email: string | null;
+          p_phone: string | null;
+          p_category: number | null;
+          p_gender: GenderType | null;
+        };
         Returns: Database["public"]["Tables"]["players"]["Row"];
       };
       get_players_by_ids: {
@@ -594,6 +630,20 @@ export interface Database {
       };
       fetch_visible_players: {
         Args: Record<string, never>;
+        Returns: {
+          player_id: string;
+          first_name: string;
+          last_name: string;
+          phone: string | null;
+          email: string | null;
+          current_rating: number | null;
+          current_rating_deviation: number | null;
+          category: number | null;
+          gender: GenderType | null;
+        }[];
+      };
+      get_player: {
+        Args: { p_player_id: string };
         Returns: {
           player_id: string;
           first_name: string;

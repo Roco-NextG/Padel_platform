@@ -2,10 +2,13 @@
 
 import { useState, useTransition, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { UserPlus, X, MagnifyingGlass, Users } from "@phosphor-icons/react";
+import { UserPlus, X, MagnifyingGlass, Users, PencilSimple } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Field } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { PlayerForm } from "@/modules/players/ui/player-form";
+import { getPlayerAction, updatePlayerAction } from "@/modules/players/application/playerActions";
+import type { VisiblePlayer } from "@/modules/players/domain/player";
 import {
   assignCategoryAction,
   createPlayerAction,
@@ -226,15 +229,19 @@ function CreatePlayerInlineForm({
 }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [gender, setGender] = useState<GenderType>("MALE");
   const [category, setCategory] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const canCreate = firstName.trim() && lastName.trim() && phone.trim() && email.trim() && category;
+
   function handleCreate() {
     setError(null);
     startTransition(async () => {
-      const result = await createPlayerAction(tournamentId, firstName, lastName, gender, Number(category) || 0);
+      const result = await createPlayerAction(tournamentId, firstName, lastName, gender, Number(category) || 0, phone, email);
       if (result.error || !result.player) {
         setError(result.error ?? "No se pudo crear el jugador.");
         return;
@@ -249,15 +256,14 @@ function CreatePlayerInlineForm({
         <Field id="firstName" label="Nombre">
           <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
         </Field>
-        <Field id="lastName" label="Apellido" optional>
+        <Field id="lastName" label="Apellidos">
           <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} />
         </Field>
-        <Field id="gender" label="Género">
-          <Select id="gender" value={gender} onChange={(e) => setGender(e.target.value as GenderType)}>
-            <option value="MALE">Masculino</option>
-            <option value="FEMALE">Femenino</option>
-            <option value="OTHER">Otro</option>
-          </Select>
+        <Field id="email" label="Email">
+          <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </Field>
+        <Field id="phone" label="Teléfono">
+          <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </Field>
         <Field id="category" label="Categoría">
           <Select id="category" value={category} onChange={(e) => setCategory(e.target.value)}>
@@ -269,10 +275,17 @@ function CreatePlayerInlineForm({
             ))}
           </Select>
         </Field>
+        <Field id="gender" label="Género" optional>
+          <Select id="gender" value={gender} onChange={(e) => setGender(e.target.value as GenderType)}>
+            <option value="MALE">Masculino</option>
+            <option value="FEMALE">Femenino</option>
+            <option value="OTHER">Otro</option>
+          </Select>
+        </Field>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2">
-        <Button type="button" size="sm" loading={isPending} disabled={!firstName.trim() || !category} onClick={handleCreate}>
+        <Button type="button" size="sm" loading={isPending} disabled={!canCreate} onClick={handleCreate}>
           Crear y seleccionar
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
@@ -280,6 +293,46 @@ function CreatePlayerInlineForm({
         </Button>
       </div>
     </div>
+  );
+}
+
+function PlayerEditSlot({
+  playerId,
+  onUpdated,
+  onDone,
+}: {
+  playerId: string;
+  onUpdated: (patch: { firstName: string; lastName: string }) => void;
+  onDone: () => void;
+}) {
+  const [player, setPlayer] = useState<VisiblePlayer | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPlayerAction(playerId).then((result) => {
+      if (cancelled) return;
+      if (result.player) setPlayer(result.player);
+      else setError(result.error ?? "No se pudo cargar el jugador.");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [playerId]);
+
+  if (error) return <p className="text-xs text-destructive">{error}</p>;
+  if (!player) return <p className="text-xs text-muted-foreground">Cargando jugador...</p>;
+
+  return (
+    <PlayerForm
+      action={updatePlayerAction.bind(null, playerId)}
+      player={player}
+      onSaved={(p) => {
+        onUpdated({ firstName: p.firstName, lastName: p.lastName });
+        onDone();
+      }}
+      onCancel={onDone}
+    />
   );
 }
 
@@ -297,12 +350,19 @@ export function EnrollmentPanel({
   const [teams, setTeams] = useState(initialTeams);
   const [isPending, startTransition] = useTransition();
   const [showAdd, setShowAdd] = useState(false);
+  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
 
   function handleRemove(teamId: string) {
     startTransition(async () => {
       const result = await removeTeamAction(tournamentId, teamId);
       if (!result.error) setTeams((prev) => prev.filter((t) => t.teamId !== teamId));
     });
+  }
+
+  function handlePlayerUpdated(playerId: string, patch: { firstName: string; lastName: string }) {
+    setTeams((prev) =>
+      prev.map((t) => ({ ...t, players: t.players.map((p) => (p.playerId === playerId ? { ...p, ...patch } : p)) }))
+    );
   }
 
   return (
@@ -315,20 +375,42 @@ export function EnrollmentPanel({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2"
+            className="flex flex-col gap-2 rounded-md border border-border bg-surface px-3 py-2"
           >
-            <div className="flex items-center gap-2 text-sm text-foreground">
-              <Users className="size-4 text-muted-foreground" />
-              {team.players.map(playerLabel).join(" / ")}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-foreground">
+                <Users className="size-4 shrink-0 text-muted-foreground" />
+                {team.players.map((p, i) => (
+                  <span key={p.playerId} className="flex items-center gap-1">
+                    {i > 0 && <span className="text-muted-foreground">/</span>}
+                    {playerLabel(p)}
+                    <button
+                      type="button"
+                      onClick={() => setEditingPlayerId(p.playerId)}
+                      aria-label="Editar jugador"
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <PencilSimple className="size-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => handleRemove(team.teamId)}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <X className="size-4" />
+              </button>
             </div>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => handleRemove(team.teamId)}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <X className="size-4" />
-            </button>
+            {team.players.some((p) => p.playerId === editingPlayerId) && (
+              <PlayerEditSlot
+                playerId={editingPlayerId!}
+                onUpdated={(patch) => handlePlayerUpdated(editingPlayerId!, patch)}
+                onDone={() => setEditingPlayerId(null)}
+              />
+            )}
           </motion.div>
         ))}
       </AnimatePresence>

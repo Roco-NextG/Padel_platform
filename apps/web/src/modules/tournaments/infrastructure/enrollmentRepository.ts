@@ -24,7 +24,9 @@ export async function createPlayerForEnrollment(
   firstName: string,
   lastName: string,
   gender: GenderType,
-  category: number
+  category: number,
+  phone: string | null,
+  email: string | null
 ): Promise<PlayerSearchResult> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("create_player_for_enrollment", {
@@ -32,6 +34,8 @@ export async function createPlayerForEnrollment(
     p_last_name: lastName,
     p_gender: gender,
     p_category: category,
+    p_phone: phone,
+    p_email: email,
   });
   if (error) throw new Error(error.message);
 
@@ -39,7 +43,7 @@ export async function createPlayerForEnrollment(
     playerId: data.id,
     firstName: data.first_name,
     lastName: data.last_name,
-    email: null,
+    email: data.email,
     gender: data.gender,
     category: data.category,
   };

@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { useHourFormat } from "@/components/theme/hour-format-provider";
 
 function subscribe(callback: () => void) {
   const id = setInterval(callback, 1000);
@@ -24,12 +25,19 @@ function getServerSnapshot(): number | null {
 
 export function HeaderClock({ timeZone }: { timeZone: string }) {
   const now = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const { hourFormat } = useHourFormat();
 
   if (now == null) return <span className="w-16 text-sm tabular-nums text-muted-foreground" />;
 
   return (
     <span className="text-sm font-medium tabular-nums text-foreground">
-      {new Date(now).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone })}
+      {new Date(now).toLocaleTimeString("es-VE", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        timeZone,
+        hour12: hourFormat === "12h",
+      })}
     </span>
   );
 }
