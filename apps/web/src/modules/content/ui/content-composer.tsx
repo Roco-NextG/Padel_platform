@@ -435,9 +435,9 @@ function ToggleRow({
         )}
       >
         <motion.span
-          animate={{ x: checked ? 16 : 2 }}
+          animate={{ x: checked ? 14 : 0 }}
           transition={{ type: "spring", stiffness: 500, damping: 32 }}
-          className="absolute top-0.5 size-4 rounded-full bg-white shadow-md"
+          className="absolute left-0.5 top-0.5 size-4 rounded-full bg-white shadow-md"
         />
       </button>
     </label>
