@@ -3,9 +3,9 @@
 import { useMemo, useRef, useState } from "react";
 import { motion, useScroll, useTransform, type MotionValue } from "motion/react";
 import { cn } from "@/lib/utils";
-import { GroupStandings } from "./group-standings";
+import { GroupsPhaseContent } from "./groups-phase-content";
 import { BracketColumn } from "./bracket-view";
-import type { BracketRoundView } from "../domain/bracket";
+import type { BracketRoundView, GlobalStandingsEntry } from "../domain/bracket";
 import type { GroupStandingsView } from "../infrastructure/bracketRepository";
 import type { PhaseType } from "@/lib/supabase/database.types";
 
@@ -40,7 +40,12 @@ interface Section {
   content: React.ReactNode;
 }
 
-function buildSections(groups: GroupStandingsView[], bracket: BracketRoundView[], tournamentId: string): Section[] {
+function buildSections(
+  groups: GroupStandingsView[],
+  globalStandings: GlobalStandingsEntry[],
+  bracket: BracketRoundView[],
+  tournamentId: string
+): Section[] {
   const list: Section[] = [];
   if (groups.length > 0) {
     // Editable (drag & drop entre grupos) solo si NINGÚN equipo tiene partidos jugados todavía en NINGÚN grupo — mover parejas después invalidaría estadísticas ya calculadas (misma regla dura reforzada en swapGroupTeams).
@@ -51,7 +56,14 @@ function buildSections(groups: GroupStandingsView[], bracket: BracketRoundView[]
       heading: SECTION_HEADING.GROUPS,
       watermark: NAV_SHORT_LABEL.GROUPS.toUpperCase(),
       speed: 0.5,
-      content: <GroupStandings groups={groups} editable={groupsEditable} tournamentId={tournamentId} />,
+      content: (
+        <GroupsPhaseContent
+          groups={groups}
+          globalStandings={globalStandings}
+          editable={groupsEditable}
+          tournamentId={tournamentId}
+        />
+      ),
     });
   }
   bracket.forEach((round, i) => {
@@ -70,12 +82,25 @@ function buildSections(groups: GroupStandingsView[], bracket: BracketRoundView[]
   return list;
 }
 
-export function PhaseFlow({ groups, bracket, tournamentId }: { groups: GroupStandingsView[]; bracket: BracketRoundView[]; tournamentId: string }) {
+export function PhaseFlow({
+  groups,
+  globalStandings,
+  bracket,
+  tournamentId,
+}: {
+  groups: GroupStandingsView[];
+  globalStandings: GlobalStandingsEntry[];
+  bracket: BracketRoundView[];
+  tournamentId: string;
+}) {
   const flowRef = useRef<HTMLDivElement>(null);
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const { scrollX } = useScroll({ container: flowRef });
 
-  const sections: Section[] = useMemo(() => buildSections(groups, bracket, tournamentId), [groups, bracket, tournamentId]);
+  const sections: Section[] = useMemo(
+    () => buildSections(groups, globalStandings, bracket, tournamentId),
+    [groups, globalStandings, bracket, tournamentId]
+  );
   const [activeId, setActiveId] = useState<string | null>(() => sections[0]?.id ?? null);
 
   /**
