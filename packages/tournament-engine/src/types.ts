@@ -37,6 +37,8 @@ export interface SeededTeam {
   groupId?: GroupId | null;
   /** 1 = más fuerte */
   seed: number;
+  /** true si este equipo quedó en empate exacto en la lista global de fortaleza (04_TOURNAMENT_ENGINE.md §4.1) y requiere resolución manual del organizador */
+  requiresManualResolution?: boolean;
 }
 
 export interface BracketSlot {

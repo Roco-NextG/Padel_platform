@@ -105,14 +105,28 @@ export function generateBracket(seededTeams: SeededTeam[]): BracketResult {
 }
 
 // ---------------------------------------------------------------------------
-// Separación de grupo de origen — mejora local acotada, nunca bloqueante.
+// Separación de grupo de origen (04_TOURNAMENT_ENGINE.md §4.3) — swap acotado
+// por mitad, nunca bloqueante.
+//
+// Procedimiento exacto confirmado: tras la colocación por seed (§4.2), se
+// revisa cada MITAD del cuadro — no cada ronda posible como hacía la versión
+// anterior. Si dos parejas del mismo group_id cayeron en la misma mitad, se
+// intercambia la posición de la más débil (seed más alto) de las dos con la
+// pareja de rango de seed más cercano en la mitad opuesta — el ajuste mínimo
+// necesario. Resultado neto: dos parejas del mismo grupo de origen solo
+// podrían volver a enfrentarse en la final.
+//
+// Los seeds 1 y 2 NUNCA se usan como candidato de swap: por construcción de
+// generateSeedOrder ya están en mitades opuestas (§4.2), y tocarlos acá para
+// resolver el conflicto de OTRO par rompería esa garantía sin necesidad —
+// con cualquier bracket no trivial sobran candidatos de seed cercano que no
+// son 1 ni 2.
 // ---------------------------------------------------------------------------
 
 interface Conflict {
   i: number;
   j: number;
   groupId: GroupId;
-  round: number;
 }
 
 function resolveGroupConflicts(
@@ -122,9 +136,10 @@ function resolveGroupConflicts(
   const teamGroup = new Map<string, GroupId | null>();
   for (const t of seededTeams) teamGroup.set(t.teamId, t.groupId ?? null);
 
-  const finalRound = Math.log2(initialSlots.length);
+  const half = initialSlots.length / 2;
+  const halfOf = (position: number): 0 | 1 => (position < half ? 0 : 1);
 
-  const findConflicts = (arr: BracketSlot[]): Conflict[] => {
+  const findSameHalfConflicts = (arr: BracketSlot[]): Conflict[] => {
     const list: Conflict[] = [];
     for (let i = 0; i < arr.length; i++) {
       if (!arr[i].teamId) continue;
@@ -132,60 +147,56 @@ function resolveGroupConflicts(
       if (gA == null) continue;
       for (let j = i + 1; j < arr.length; j++) {
         if (!arr[j].teamId) continue;
-        const gB = teamGroup.get(arr[j].teamId!);
-        if (gA === gB) {
-          const round = earliestPossibleRound(arr[i].position, arr[j].position);
-          if (round < finalRound) list.push({ i, j, groupId: gA, round });
-        }
+        if (halfOf(arr[i].position) !== halfOf(arr[j].position)) continue;
+        if (teamGroup.get(arr[j].teamId!) === gA) list.push({ i, j, groupId: gA });
       }
     }
-    return list.sort((a, b) => a.round - b.round);
+    return list;
   };
-
-  const penaltyOf = (arr: BracketSlot[]): number =>
-    findConflicts(arr).reduce((sum, c) => sum + (finalRound - c.round), 0);
 
   let slots = initialSlots.map((s) => ({ ...s }));
   const givenUp = new Set<string>();
-  const maxIterations = Math.max(slots.length * 6, 24);
-  let iterations = 0;
+  const maxIterations = Math.max(slots.length * 4, 20);
 
-  while (iterations < maxIterations) {
-    iterations++;
-    const active = findConflicts(slots).filter(
+  for (let iterations = 0; iterations < maxIterations; iterations++) {
+    const active = findSameHalfConflicts(slots).filter(
       (c) => !givenUp.has(pairKey(slots[c.i], slots[c.j]))
     );
     if (active.length === 0) break;
 
-    const target = active[0];
-    const basePenalty = penaltyOf(slots);
-    let bestCandidateIndex = -1;
-    let bestPenalty = basePenalty;
+    const { i, j } = active[0];
+    // reubicar a la más débil (seed más alto) de las dos parejas en conflicto
+    const moveIdx = slots[i].seed > slots[j].seed ? i : j;
+    const moving = slots[moveIdx];
+    const targetHalf = halfOf(moving.position) === 0 ? 1 : 0;
 
-    for (let k = 0; k < slots.length; k++) {
-      if (k === target.j || !slots[k].teamId) continue;
-      const trial = swapTeams(slots, target.j, k);
-      const p = penaltyOf(trial);
-      if (p < bestPenalty) {
-        bestPenalty = p;
-        bestCandidateIndex = k;
+    const candidates = slots
+      .map((s, k) => ({ seed: s.seed, k }))
+      .filter(({ k }) => slots[k].teamId && halfOf(slots[k].position) === targetHalf && slots[k].seed !== 1 && slots[k].seed !== 2)
+      .sort((a, b) => Math.abs(a.seed - moving.seed) - Math.abs(b.seed - moving.seed));
+
+    const conflictCountBefore = active.length;
+    let swapped = false;
+    for (const c of candidates) {
+      const trial = swapTeams(slots, moveIdx, c.k);
+      if (findSameHalfConflicts(trial).length < conflictCountBefore) {
+        slots = trial;
+        swapped = true;
+        break;
       }
     }
 
-    if (bestCandidateIndex === -1) {
-      givenUp.add(pairKey(slots[target.i], slots[target.j]));
-      continue;
+    if (!swapped) {
+      givenUp.add(pairKey(slots[i], slots[j]));
     }
-
-    slots = swapTeams(slots, target.j, bestCandidateIndex);
   }
 
-  const remaining = findConflicts(slots);
+  const remaining = findSameHalfConflicts(slots);
   const unresolvedGroupConflicts: GroupConflict[] = remaining.map((c) => ({
     teamAId: slots[c.i].teamId!,
     teamBId: slots[c.j].teamId!,
     groupId: c.groupId,
-    earliestPossibleRound: c.round,
+    earliestPossibleRound: earliestPossibleRound(slots[c.i].position, slots[c.j].position),
   }));
 
   return { slots, unresolvedGroupConflicts };
