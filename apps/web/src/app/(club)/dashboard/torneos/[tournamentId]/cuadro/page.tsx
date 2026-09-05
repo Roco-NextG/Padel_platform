@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTournament } from "@/modules/tournaments/application/getTournaments";
 import { fetchCategories } from "@/modules/tournaments/infrastructure/tournamentRepository";
-import { fetchGroupStandings, fetchBracketView } from "@/modules/tournaments/infrastructure/bracketRepository";
+import { fetchGroupStandings, fetchGlobalStandings, fetchBracketView } from "@/modules/tournaments/infrastructure/bracketRepository";
 import { fetchMatchesForCategory } from "@/modules/matches/infrastructure/matchRepository";
 import { TournamentStatusBadge } from "@/modules/tournaments/ui/tournament-status-badge";
 import { PhaseFlow } from "@/modules/tournaments/ui/phase-flow";
@@ -32,13 +32,14 @@ export default async function CuadroPage({
   const categories = await fetchCategories(tournamentId);
   const selected = categories.find((c) => c.id === categoria) ?? categories[0] ?? null;
 
-  const [groups, bracket, matches] = selected
+  const [groups, globalStandings, bracket, matches] = selected
     ? await Promise.all([
         selected.usesGroupStage ? fetchGroupStandings(selected.id) : Promise.resolve([]),
+        selected.usesGroupStage ? fetchGlobalStandings(selected.id) : Promise.resolve([]),
         fetchBracketView(selected.id),
         fetchMatchesForCategory(selected.id),
       ])
-    : [[], [], []];
+    : [[], [], [], []];
 
   return (
     <div className="flex flex-col gap-6">
@@ -93,7 +94,9 @@ export default async function CuadroPage({
             </Card>
           )}
 
-          {(groups.length > 0 || bracket.length > 0) && <PhaseFlow groups={groups} bracket={bracket} tournamentId={tournamentId} />}
+          {(groups.length > 0 || bracket.length > 0) && (
+            <PhaseFlow groups={groups} globalStandings={globalStandings} bracket={bracket} tournamentId={tournamentId} />
+          )}
         </div>
       )}
     </div>

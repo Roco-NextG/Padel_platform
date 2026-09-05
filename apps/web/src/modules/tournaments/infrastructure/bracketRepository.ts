@@ -12,7 +12,13 @@ import {
 import { RATING_CONFIG } from "@padel-platform/rating-engine";
 import { createClient } from "@/lib/supabase/server";
 import { fetchTeamsForCategory } from "./enrollmentRepository";
-import { phaseTypeForRound, QUALIFYING_SLOTS_PER_GROUP, type BracketRoundView, type BracketTeamInfo } from "../domain/bracket";
+import {
+  phaseTypeForRound,
+  QUALIFYING_SLOTS_PER_GROUP,
+  type BracketRoundView,
+  type BracketTeamInfo,
+  type GlobalStandingsEntry,
+} from "../domain/bracket";
 
 interface SetRow {
   team_a_games: number;
@@ -124,6 +130,96 @@ export async function fetchGroupStandings(categoryId: string): Promise<GroupStan
   });
 }
 
+/**
+ * Standings de cada grupo, ya recortados a los clasificados
+ * (QUALIFYING_SLOTS_PER_GROUP) — única fuente de este cálculo. La usan
+ * generateBracketForCategory (para sembrar el cuadro real) y
+ * fetchGlobalStandings (para la tabla que ve el organizador ANTES de
+ * generar el cuadro) — así la tabla y el cuadro nunca pueden desincronizarse:
+ * ambos llaman a balancedSeeding() con exactamente el mismo input.
+ */
+async function fetchQualifiedStandingsByGroup(
+  categoryId: string,
+  groupsPhaseId: string
+): Promise<{
+  standingsByGroup: Record<string, GroupStanding[]>;
+  groupNameById: Map<string, string>;
+  allMatchesConfirmed: boolean;
+}> {
+  const supabase = await createClient();
+  const [{ data: groups }, { data: teamsInGroups }, { data: matches }] = await Promise.all([
+    supabase.from("tournament_groups").select("id, name").eq("category_id", categoryId),
+    supabase.from("teams").select("id, group_id").eq("tournament_category_id", categoryId).not("group_id", "is", null),
+    supabase
+      .from("matches")
+      .select("id, group_id, team_a_id, team_b_id, winner_team_id, status, set_scores(team_a_games, team_b_games)")
+      .eq("phase_id", groupsPhaseId),
+  ]);
+
+  const allMatchesConfirmed = (matches ?? []).every((m) => m.status === "CONFIRMED");
+  const groupNameById = new Map((groups ?? []).map((g) => [g.id, g.name]));
+
+  const standingsByGroup: Record<string, GroupStanding[]> = {};
+  for (const g of groups ?? []) {
+    const teamIds = (teamsInGroups ?? []).filter((t) => t.group_id === g.id).map((t) => t.id);
+    const results = (matches ?? [])
+      .filter((m): m is typeof m & { team_a_id: string; team_b_id: string; winner_team_id: string } =>
+        m.group_id === g.id && m.status === "CONFIRMED" && !!m.team_a_id && !!m.team_b_id && !!m.winner_team_id
+      )
+      .map((m) => toMatchResult({ ...m, set_scores: m.set_scores as unknown as SetRow[] }));
+    // Solo los clasificados (04_TOURNAMENT_ENGINE.md §4.1) entran a la
+    // lista global de fortaleza — antes se pasaba el grupo entero, y todo
+    // equipo eliminado en grupos terminaba igual sembrado en el cuadro.
+    standingsByGroup[g.id] = calculateStandings(teamIds, results).slice(0, QUALIFYING_SLOTS_PER_GROUP);
+  }
+
+  return { standingsByGroup, groupNameById, allMatchesConfirmed };
+}
+
+/**
+ * Tabla global de fortaleza (04_TOURNAMENT_ENGINE.md §4.1) para que el
+ * organizador la vea ANTES de generar el cuadro — mismo orden exacto que
+ * balancedSeeding() usa para sembrar, reutilizado directo (ver
+ * fetchQualifiedStandingsByGroup) en vez de reordenar en el frontend.
+ * A diferencia de generateBracketForCategory, no exige que todos los
+ * partidos de grupos estén confirmados: es una foto en vivo de cómo está
+ * la clasificación con lo que ya se confirmó hasta ahora.
+ */
+export async function fetchGlobalStandings(categoryId: string): Promise<GlobalStandingsEntry[]> {
+  const supabase = await createClient();
+  const { data: groupsPhase } = await supabase.from("tournament_phases").select("id").eq("category_id", categoryId).eq("type", "GROUPS").maybeSingle();
+  if (!groupsPhase) return [];
+
+  const [{ standingsByGroup, groupNameById }, teams] = await Promise.all([
+    fetchQualifiedStandingsByGroup(categoryId, groupsPhase.id),
+    fetchTeamsForCategory(categoryId),
+  ]);
+
+  const teamLabelById = new Map(
+    teams.map((t) => [t.teamId, t.players.map((p) => `${p.firstName} ${p.lastName}`.trim()).join(" / ")])
+  );
+  const standingByTeamId = new Map<string, GroupStanding>();
+  for (const list of Object.values(standingsByGroup)) {
+    for (const s of list) standingByTeamId.set(s.teamId, s);
+  }
+
+  return balancedSeeding(standingsByGroup).map((s): GlobalStandingsEntry => {
+    const standing = standingByTeamId.get(s.teamId)!;
+    return {
+      teamId: s.teamId,
+      teamLabel: teamLabelById.get(s.teamId) ?? "?",
+      groupName: (s.groupId && groupNameById.get(s.groupId)) ?? "?",
+      seed: s.seed,
+      matchesWon: standing.matchesWon,
+      gamesWon: standing.gamesWon,
+      gamesLost: standing.gamesLost,
+      setDiff: standing.setDiff,
+      gameDiff: standing.gameDiff,
+      requiresManualResolution: s.requiresManualResolution ?? false,
+    };
+  });
+}
+
 export async function generateBracketForCategory(tournamentId: string, categoryId: string): Promise<void> {
   const supabase = await createClient();
 
@@ -152,32 +248,9 @@ export async function generateBracketForCategory(tournamentId: string, categoryI
     const { data: groupsPhase } = await supabase.from("tournament_phases").select("id").eq("category_id", categoryId).eq("type", "GROUPS").maybeSingle();
     if (!groupsPhase) throw new Error("Generá primero la fase de grupos.");
 
-    const [{ data: groups }, { data: teamsInGroups }, { data: matches }] = await Promise.all([
-      supabase.from("tournament_groups").select("id").eq("category_id", categoryId),
-      supabase.from("teams").select("id, group_id").eq("tournament_category_id", categoryId).not("group_id", "is", null),
-      supabase
-        .from("matches")
-        .select("id, group_id, team_a_id, team_b_id, winner_team_id, status, set_scores(team_a_games, team_b_games)")
-        .eq("phase_id", groupsPhase.id),
-    ]);
+    const { standingsByGroup, allMatchesConfirmed } = await fetchQualifiedStandingsByGroup(categoryId, groupsPhase.id);
+    if (!allMatchesConfirmed) throw new Error("Todavía hay partidos de grupos sin confirmar.");
 
-    if ((matches ?? []).some((m) => m.status !== "CONFIRMED")) {
-      throw new Error("Todavía hay partidos de grupos sin confirmar.");
-    }
-
-    const standingsByGroup: Record<string, GroupStanding[]> = {};
-    for (const g of groups ?? []) {
-      const teamIds = (teamsInGroups ?? []).filter((t) => t.group_id === g.id).map((t) => t.id);
-      const results = (matches ?? [])
-        .filter((m): m is typeof m & { team_a_id: string; team_b_id: string; winner_team_id: string } =>
-          m.group_id === g.id && !!m.team_a_id && !!m.team_b_id && !!m.winner_team_id
-        )
-        .map((m) => toMatchResult({ ...m, set_scores: m.set_scores as unknown as SetRow[] }));
-      // Solo los clasificados (04_TOURNAMENT_ENGINE.md §4.1) entran a la
-      // lista global de fortaleza — antes se pasaba el grupo entero, y todo
-      // equipo eliminado en grupos terminaba igual sembrado en el cuadro.
-      standingsByGroup[g.id] = calculateStandings(teamIds, results).slice(0, QUALIFYING_SLOTS_PER_GROUP);
-    }
     seededTeams = balancedSeeding(standingsByGroup);
   } else {
     const { data: teamRatings } = await supabase

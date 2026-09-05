@@ -11,6 +11,26 @@ import type { PhaseType } from "@/lib/supabase/database.types";
  */
 export const QUALIFYING_SLOTS_PER_GROUP = 2;
 
+/**
+ * Una fila de la tabla global de fortaleza (04_TOURNAMENT_ENGINE.md §4.1) —
+ * TODOS los clasificados de TODOS los grupos, en el mismo orden exacto que
+ * usa balancedSeeding() para sembrar el cuadro. `seed` es ese mismo número:
+ * si el organizador ya generó el cuadro, la posición 1 de esta tabla es
+ * literalmente el seed 1 del bracket.
+ */
+export interface GlobalStandingsEntry {
+  teamId: string;
+  teamLabel: string;
+  groupName: string;
+  seed: number;
+  matchesWon: number;
+  gamesWon: number;
+  gamesLost: number;
+  setDiff: number;
+  gameDiff: number;
+  requiresManualResolution: boolean;
+}
+
 /** roundNumber: 1 = primera ronda, totalRounds = final. */
 export function phaseTypeForRound(roundNumber: number, totalRounds: number): PhaseType {
   const distanceFromFinal = totalRounds - roundNumber;
