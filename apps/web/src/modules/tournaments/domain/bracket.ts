@@ -1,5 +1,16 @@
 import type { PhaseType } from "@/lib/supabase/database.types";
 
+/**
+ * Cuántos equipos de cada grupo avanzan al cuadro de eliminación. Fuente
+ * única — antes vivía solo como constante de UI en group-standings.tsx (la
+ * etiqueta "CLASIFICA"), pero nunca se aplicaba al armar el bracket: el
+ * pipeline pasaba TODOS los equipos de cada grupo a balancedSeeding, no
+ * solo los clasificados. 04_TOURNAMENT_ENGINE.md §4.1 asume que la lista
+ * global de fortaleza se construye a partir de "los clasificados" —
+ * bracketRepository.ts ahora recorta acá antes de sembrar.
+ */
+export const QUALIFYING_SLOTS_PER_GROUP = 2;
+
 /** roundNumber: 1 = primera ronda, totalRounds = final. */
 export function phaseTypeForRound(roundNumber: number, totalRounds: number): PhaseType {
   const distanceFromFinal = totalRounds - roundNumber;

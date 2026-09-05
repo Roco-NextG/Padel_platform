@@ -21,7 +21,7 @@ export interface BracketRound {
  * directa de `firstRoundMatches`; el resto arrancan vacías y se rellenan a
  * medida que se confirman partidos (`advanceBracket`) — salvo los byes de
  * la ronda 1, que se propagan de inmediato porque no hay partido que jugar
- * (docs/04_TOURNAMENT_ENGINE.md §8: "se genera automáticamente el/los Match
+ * (docs/04_TOURNAMENT_ENGINE.md §7: "se genera automáticamente el/los Match
  * de la siguiente ronda... dejando team_a/team_b pendiente hasta que ambos
  * lados del cruce estén confirmados").
  */

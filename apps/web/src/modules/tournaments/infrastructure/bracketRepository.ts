@@ -12,7 +12,7 @@ import {
 import { RATING_CONFIG } from "@padel-platform/rating-engine";
 import { createClient } from "@/lib/supabase/server";
 import { fetchTeamsForCategory } from "./enrollmentRepository";
-import { phaseTypeForRound, type BracketRoundView, type BracketTeamInfo } from "../domain/bracket";
+import { phaseTypeForRound, QUALIFYING_SLOTS_PER_GROUP, type BracketRoundView, type BracketTeamInfo } from "../domain/bracket";
 
 interface SetRow {
   team_a_games: number;
@@ -173,7 +173,10 @@ export async function generateBracketForCategory(tournamentId: string, categoryI
           m.group_id === g.id && !!m.team_a_id && !!m.team_b_id && !!m.winner_team_id
         )
         .map((m) => toMatchResult({ ...m, set_scores: m.set_scores as unknown as SetRow[] }));
-      standingsByGroup[g.id] = calculateStandings(teamIds, results);
+      // Solo los clasificados (04_TOURNAMENT_ENGINE.md §4.1) entran a la
+      // lista global de fortaleza — antes se pasaba el grupo entero, y todo
+      // equipo eliminado en grupos terminaba igual sembrado en el cuadro.
+      standingsByGroup[g.id] = calculateStandings(teamIds, results).slice(0, QUALIFYING_SLOTS_PER_GROUP);
     }
     seededTeams = balancedSeeding(standingsByGroup);
   } else {
