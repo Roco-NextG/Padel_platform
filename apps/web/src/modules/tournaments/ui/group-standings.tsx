@@ -6,10 +6,8 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { swapGroupTeamsAction } from "../application/bracketActions";
+import { QUALIFYING_SLOTS_PER_GROUP } from "../domain/bracket";
 import type { GroupStandingsView } from "../infrastructure/bracketRepository";
-
-/** Anatomía calcada de .group-card/.g-row (padel-platform.html): top 2 de cada grupo clasifican al cuadro, mismo criterio que balancedSeeding usa para sembrar. */
-const QUALIFYING_SLOTS = 2;
 
 type Standing = GroupStandingsView["standings"][number];
 
@@ -123,7 +121,7 @@ export function GroupStandings({
           <h3 className="text-sm font-semibold text-foreground">{g.groupName}</h3>
           <div className="flex flex-col">
             {g.standings.map((s, i) => (
-              <GroupRow key={s.teamId} standing={s} position={i + 1} qualifies={i < QUALIFYING_SLOTS} draggable={editable} />
+              <GroupRow key={s.teamId} standing={s} position={i + 1} qualifies={i < QUALIFYING_SLOTS_PER_GROUP} draggable={editable} />
             ))}
           </div>
         </div>

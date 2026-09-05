@@ -49,7 +49,7 @@ export function earliestPossibleRound(positionA: number, positionB: number): num
 
 /**
  * Genera el bracket completo a partir de una lista de equipos ya sembrados
- * (seed 1 = más fuerte). Soporta cualquier N (04_TOURNAMENT_ENGINE.md §6):
+ * (seed 1 = más fuerte). Soporta cualquier N (04_TOURNAMENT_ENGINE.md §5):
  * calcula bracket_size = siguiente potencia de 2, asigna byes a los mejores
  * seeds, y aplica el algoritmo de seeding estándar para el resto.
  *

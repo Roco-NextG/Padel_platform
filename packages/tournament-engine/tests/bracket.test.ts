@@ -44,7 +44,7 @@ describe("generateSeedOrder — cabezas de serie estándar", () => {
   });
 });
 
-describe("generateBracket — matriz de pruebas obligatoria (04_TOURNAMENT_ENGINE.md §9)", () => {
+describe("generateBracket — matriz de pruebas obligatoria (04_TOURNAMENT_ENGINE.md §8)", () => {
   it.each([8, 16, 32])("con %i parejas exactas: sin byes, bracket válido", (n) => {
     const teams = makeTeams(n);
     const result = generateBracket(teams);
