@@ -180,7 +180,7 @@ export async function fetchRecentResults(account: ClubSurfaceAccount, limit: num
 export interface MatchRatingContext {
   tournamentId: string;
   categoryId: string | null;
-  matchType: "TOURNAMENT" | "COMPETITIVE" | "CASUAL";
+  matchType: "TOURNAMENT" | "COMPETITIVE" | "CASUAL" | "LEAGUE";
   teamAId: string;
   teamBId: string;
   teamAPlayers: { playerId: string; rating: number | null; ratingDeviation: number | null }[];

@@ -6,10 +6,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { CaretLeft, CaretRight, ListChecks } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { WizardStepper } from "./wizard-stepper";
-import { WIZARD_STEP_LABELS, type WizardStepId } from "../domain/tournament";
 
 export interface WizardStep {
-  id: WizardStepId;
+  id: string;
   done: boolean;
   content: React.ReactNode;
 }
@@ -24,15 +23,15 @@ export interface WizardStep {
  * wizard de creación desde cero), así que saltar directo a cualquier paso
  * por el stepper es seguro y más útil que forzar Siguiente/Atrás.
  */
-export function TournamentWizard({ steps }: { steps: WizardStep[] }) {
+export function StepWizard({ steps, stepLabels }: { steps: WizardStep[]; stepLabels: Record<string, string> }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const stepIds = steps.map((s) => s.id);
-  const doneMap = Object.fromEntries(steps.map((s) => [s.id, s.done])) as Record<WizardStepId, boolean>;
+  const doneMap = Object.fromEntries(steps.map((s) => [s.id, s.done]));
   const isLast = activeIndex === steps.length - 1;
 
   return (
     <div className="flex flex-col gap-6 pb-24">
-      <WizardStepper stepIds={stepIds} doneMap={doneMap} activeIndex={activeIndex} onSelect={setActiveIndex} />
+      <WizardStepper stepIds={stepIds} labels={stepLabels} doneMap={doneMap} activeIndex={activeIndex} onSelect={setActiveIndex} />
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -49,7 +48,7 @@ export function TournamentWizard({ steps }: { steps: WizardStep[] }) {
       <div className="fixed inset-x-0 bottom-5 z-20 flex justify-center px-4">
         <div className="glass flex items-center gap-4 rounded-full px-4 py-2.5 shadow-lg">
           <span className="text-xs text-muted-foreground">
-            Paso {activeIndex + 1} de {steps.length} · {WIZARD_STEP_LABELS[steps[activeIndex].id]}
+            Paso {activeIndex + 1} de {steps.length} · {stepLabels[steps[activeIndex].id]}
           </span>
           {activeIndex > 0 && (
             <Button type="button" variant="ghost" size="sm" onClick={() => setActiveIndex((i) => i - 1)} className="gap-1">

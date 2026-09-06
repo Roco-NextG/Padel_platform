@@ -36,7 +36,7 @@ export type PhaseType =
   | "SEMIFINAL"
   | "FINAL"
   | "CONSOLATION";
-export type DbMatchType = "TOURNAMENT" | "COMPETITIVE" | "CASUAL";
+export type DbMatchType = "TOURNAMENT" | "COMPETITIVE" | "CASUAL" | "LEAGUE";
 export type MatchStatus =
   | "SCHEDULED"
   | "IN_PROGRESS"
@@ -268,17 +268,90 @@ export interface Database {
         Insert: { id?: string; category_id: string; type: PhaseType; order_index: number };
         Update: Partial<Database["public"]["Tables"]["tournament_phases"]["Insert"]>;
       };
+      leagues: {
+        Relationships: [];
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          club_id: string;
+          organizer_id: string | null;
+          is_published: boolean;
+          start_date: string | null;
+          end_date: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          club_id: string;
+          organizer_id?: string | null;
+          is_published?: boolean;
+          start_date?: string | null;
+          end_date?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["leagues"]["Insert"]>;
+      };
+      league_categories: {
+        Relationships: [];
+        Row: {
+          id: string;
+          league_id: string;
+          name: string;
+          level: string | null;
+          gender_restriction: GenderType | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          league_id: string;
+          name: string;
+          level?: string | null;
+          gender_restriction?: GenderType | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["league_categories"]["Insert"]>;
+      };
+      league_rounds: {
+        Relationships: [];
+        Row: {
+          id: string;
+          category_id: string;
+          order_index: number;
+          window_start: string | null;
+          window_end: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_id: string;
+          order_index: number;
+          window_start?: string | null;
+          window_end?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["league_rounds"]["Insert"]>;
+      };
       teams: {
         Relationships: [];
         Row: {
           id: string;
           tournament_category_id: string | null;
+          league_category_id: string | null;
           group_id: string | null;
           seed: number | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: { id?: string; tournament_category_id?: string | null; group_id?: string | null; seed?: number | null };
+        Insert: {
+          id?: string;
+          tournament_category_id?: string | null;
+          league_category_id?: string | null;
+          group_id?: string | null;
+          seed?: number | null;
+        };
         Update: Partial<Database["public"]["Tables"]["teams"]["Insert"]>;
       };
       team_members: {
@@ -300,6 +373,8 @@ export interface Database {
           tournament_id: string | null;
           phase_id: string | null;
           group_id: string | null;
+          league_id: string | null;
+          league_round_id: string | null;
           round_index: number | null;
           court_id: string | null;
           team_a_id: string | null;
@@ -321,6 +396,8 @@ export interface Database {
           tournament_id?: string | null;
           phase_id?: string | null;
           group_id?: string | null;
+          league_id?: string | null;
+          league_round_id?: string | null;
           round_index?: number | null;
           court_id?: string | null;
           team_a_id?: string | null;
@@ -549,6 +626,7 @@ export interface Database {
       is_club: { Args: { target_club_id: string }; Returns: boolean };
       is_organizer: { Args: { target_organizer_id: string }; Returns: boolean };
       is_tournament_manager: { Args: { target_tournament_id: string }; Returns: boolean };
+      is_league_manager: { Args: { target_league_id: string }; Returns: boolean };
       is_tournament_staff: { Args: Record<string, never>; Returns: boolean };
       redeem_invite: {
         Args: Record<string, never>;
@@ -556,6 +634,10 @@ export interface Database {
       };
       search_players_for_enrollment: {
         Args: { p_tournament_id: string; p_query: string };
+        Returns: { player_id: string; first_name: string; last_name: string; email: string | null; gender: GenderType | null; category: number | null }[];
+      };
+      search_players_for_league_enrollment: {
+        Args: { p_league_id: string; p_query: string };
         Returns: { player_id: string; first_name: string; last_name: string; email: string | null; gender: GenderType | null; category: number | null }[];
       };
       create_player_for_enrollment: {

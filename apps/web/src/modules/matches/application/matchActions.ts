@@ -24,7 +24,8 @@ export interface SimpleActionState {
   error: string | null;
 }
 
-function toRatingMatchType(dbType: "TOURNAMENT" | "COMPETITIVE" | "CASUAL"): MatchTypeForRating {
+/** LEAGUE se trata como TOURNAMENT para el impacto en rating — mismo criterio "partido organizado" que un torneo, a diferencia de un amistoso CASUAL. */
+function toRatingMatchType(dbType: "TOURNAMENT" | "COMPETITIVE" | "CASUAL" | "LEAGUE"): MatchTypeForRating {
   return dbType === "COMPETITIVE" ? "COMPETITIVE" : "TOURNAMENT";
 }
 
