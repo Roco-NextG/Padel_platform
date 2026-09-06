@@ -14,6 +14,8 @@ export interface League {
   categoryCount: number;
   teamCount: number;
   createdAt: string;
+  logoUrl: string | null;
+  coverImageUrl: string | null;
 }
 
 /** Mismos 3 buckets que cardStatus() de torneos (tournaments/domain/tournament.ts) — una Liga no tiene status propio en DB, solo is_published + si ya tiene categorías armadas. */

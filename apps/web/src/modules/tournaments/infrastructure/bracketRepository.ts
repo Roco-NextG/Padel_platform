@@ -20,12 +20,13 @@ import {
   type GlobalStandingsEntry,
 } from "../domain/bracket";
 
-interface SetRow {
+export interface SetRow {
   team_a_games: number;
   team_b_games: number;
 }
 
-function toMatchResult(m: { team_a_id: string; team_b_id: string; winner_team_id: string; set_scores: SetRow[] }): MatchResult {
+/** Exportada para reutilizar en leagueRepository.ts (Liga y Torneo comparten la misma forma de fila de partido → MatchResult, sin duplicar la conversión). */
+export function toMatchResult(m: { team_a_id: string; team_b_id: string; winner_team_id: string; set_scores: SetRow[] }): MatchResult {
   let setsWonA = 0;
   let setsWonB = 0;
   let gamesWonA = 0;

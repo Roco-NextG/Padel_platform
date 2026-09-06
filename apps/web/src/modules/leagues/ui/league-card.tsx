@@ -21,6 +21,7 @@ function formatDateRange(start: string | null, end: string | null): string {
 
 export function LeagueCard({ league }: { league: League }) {
   const editPath = `/dashboard/ligas/${league.id}/editar`;
+  const viewPath = `/dashboard/ligas/${league.id}`;
   const status = leagueCardStatus(league);
 
   return (
@@ -28,14 +29,26 @@ export function LeagueCard({ league }: { league: League }) {
       <Card interactive className="relative flex h-full flex-col gap-3 overflow-hidden !p-0">
         <Link href={editPath} className="absolute inset-0 z-0" aria-label={`Editar ${league.name}`} />
 
-        <div className="relative z-[1] h-[76px] shrink-0 bg-inverse bg-[radial-gradient(circle_at_30%_0%,var(--color-accent-muted),transparent_70%)] bg-cover bg-center">
+        <div
+          className="relative z-[1] h-[76px] shrink-0 bg-inverse bg-[radial-gradient(circle_at_30%_0%,var(--color-accent-muted),transparent_70%)] bg-cover bg-center"
+          style={league.coverImageUrl ? { backgroundImage: `url(${league.coverImageUrl})` } : undefined}
+        >
           <Badge tone={CARD_STATUS_TONE[status]} className="absolute right-2.5 top-2.5">
             {LEAGUE_CARD_STATUS_LABELS[status]}
           </Badge>
           <Badge tone="neutral" className="absolute left-2.5 top-2.5">
             Liga
           </Badge>
-          <Trophy className="absolute bottom-2.5 left-3 size-5 text-inverse-foreground/70" weight="fill" />
+          {league.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={league.logoUrl}
+              alt=""
+              className="absolute bottom-2.5 left-3 size-6 rounded-full border-2 border-background object-cover"
+            />
+          ) : (
+            <Trophy className="absolute bottom-2.5 left-3 size-5 text-inverse-foreground/70" weight="fill" />
+          )}
         </div>
         <div className="relative z-[1] flex flex-1 flex-col gap-3 px-4 pb-4">
           <div className="flex flex-col gap-1">
@@ -54,10 +67,10 @@ export function LeagueCard({ league }: { league: League }) {
               </span>
             </div>
             <Link
-              href={editPath}
+              href={viewPath}
               className="relative z-[1] flex shrink-0 items-center gap-1 rounded-full border border-border-strong bg-surface px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-surface-secondary"
             >
-              Editar
+              Ver liga
               <ArrowRight className="size-3" />
             </Link>
           </div>
