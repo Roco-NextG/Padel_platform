@@ -3,13 +3,27 @@
 import { useSyncExternalStore } from "react";
 import { useHourFormat } from "@/components/theme/hour-format-provider";
 
+/**
+ * Date.now() cacheado acá y solo refrescado dentro del callback de
+ * subscribe — devolverlo directo desde getSnapshot() (como antes) rompe el
+ * contrato de useSyncExternalStore: React puede llamar a getSnapshot más de
+ * una vez por render para chequear consistencia, y dos milisegundos
+ * distintos entre esas llamadas dispara "The result of getSnapshot should
+ * be cached to avoid an infinite loop". Con el valor cacheado, getSnapshot
+ * siempre devuelve lo mismo entre un tick del interval y el siguiente.
+ */
+let cachedNow = Date.now();
+
 function subscribe(callback: () => void) {
-  const id = setInterval(callback, 1000);
+  const id = setInterval(() => {
+    cachedNow = Date.now();
+    callback();
+  }, 1000);
   return () => clearInterval(id);
 }
 
 function getSnapshot(): number {
-  return Date.now();
+  return cachedNow;
 }
 
 /**
