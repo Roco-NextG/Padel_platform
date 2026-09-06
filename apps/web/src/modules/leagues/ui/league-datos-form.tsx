@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
-import { Trophy } from "@phosphor-icons/react";
+import { Camera, PencilSimple, Trophy } from "@phosphor-icons/react";
 import { updateLeagueAction, type UpdateLeagueState } from "../application/leagueWizardActions";
+import { updateLeagueCoverImageAction, updateLeagueLogoAction } from "../application/leagueBrandingActions";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
@@ -21,21 +22,112 @@ function SaveButton() {
   );
 }
 
-/** Mismo contenedor que TournamentBanner (tournament-datos-form.tsx) — sin los botones de carga de logo/portada todavía, la Liga no tiene esos campos en DB. */
+/** Idéntico a TournamentBanner (tournament-datos-form.tsx), apuntando a las acciones de branding de Liga. */
 function LeagueBanner({ league }: { league: League }) {
+  const [coverImageUrl, setCoverImageUrl] = useState(league.coverImageUrl);
+  const [logoUrl, setLogoUrl] = useState(league.logoUrl);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    const optimisticUrl = URL.createObjectURL(file);
+    setCoverImageUrl(optimisticUrl);
+    const formData = new FormData();
+    formData.set("cover", file);
+    startTransition(async () => {
+      const result = await updateLeagueCoverImageAction(league.id, formData);
+      if (result.error) {
+        setError(result.error);
+        setCoverImageUrl(league.coverImageUrl);
+        return;
+      }
+      setCoverImageUrl(result.url);
+    });
+  }
+
+  function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    const optimisticUrl = URL.createObjectURL(file);
+    setLogoUrl(optimisticUrl);
+    const formData = new FormData();
+    formData.set("logo", file);
+    startTransition(async () => {
+      const result = await updateLeagueLogoAction(league.id, formData);
+      if (result.error) {
+        setError(result.error);
+        setLogoUrl(league.logoUrl);
+        return;
+      }
+      setLogoUrl(result.url);
+    });
+  }
+
   return (
-    <div className="relative h-[150px] overflow-hidden rounded-lg bg-surface-secondary bg-[radial-gradient(circle_at_20%_100%,var(--color-accent-muted),transparent_65%)] bg-cover bg-center">
-      <div className="absolute inset-0 flex items-end p-5">
-        <div className="flex items-center gap-3">
-          <div className="flex size-14 items-center justify-center overflow-hidden rounded-full border-4 border-background bg-accent text-accent-foreground shadow-md">
-            <Trophy className="size-6" weight="fill" />
-          </div>
-          <div className="flex flex-col text-foreground">
-            <span className="text-sm font-medium">{league.name}</span>
-            <span className="text-xs text-muted-foreground">{league.clubName}</span>
+    <div className="flex flex-col gap-2">
+      <div
+        className="relative h-[150px] overflow-hidden rounded-lg bg-surface-secondary bg-[radial-gradient(circle_at_20%_100%,var(--color-accent-muted),transparent_65%)] bg-cover bg-center"
+        style={coverImageUrl ? { backgroundImage: `url(${coverImageUrl})` } : undefined}
+      >
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => coverInputRef.current?.click()}
+          className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full bg-surface/90 text-foreground shadow-sm transition-colors hover:bg-surface"
+          aria-label="Subir imagen de portada"
+        >
+          <Camera className="size-4" />
+        </button>
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={handleCoverChange}
+        />
+
+        <div className="absolute inset-0 flex items-end p-5">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="flex size-14 items-center justify-center overflow-hidden rounded-full border-4 border-background bg-accent text-accent-foreground shadow-md">
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoUrl} alt="Logo de la liga" className="size-full object-cover" />
+                ) : (
+                  <Trophy className="size-6" weight="fill" />
+                )}
+              </div>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => logoInputRef.current?.click()}
+                className="absolute -bottom-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full border-2 border-background bg-inverse text-inverse-foreground"
+                aria-label="Subir logo de la liga"
+              >
+                <PencilSimple className="size-2.5" />
+              </button>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={handleLogoChange}
+              />
+            </div>
+            <div className="flex flex-col text-foreground">
+              <span className="text-sm font-medium">{league.name}</span>
+              <span className="text-xs text-muted-foreground">{league.clubName}</span>
+            </div>
           </div>
         </div>
       </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

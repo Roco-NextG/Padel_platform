@@ -10,7 +10,9 @@ export async function fetchMyLeagues(account: ClubSurfaceAccount): Promise<Leagu
   const supabase = await createClient();
   let query = supabase
     .from("leagues")
-    .select("id, name, description, club_id, organizer_id, is_published, start_date, end_date, created_at, clubs(name, time_zone)")
+    .select(
+      "id, name, description, club_id, organizer_id, is_published, start_date, end_date, created_at, logo_url, cover_image_url, clubs(name, time_zone)"
+    )
     .order("created_at", { ascending: false });
 
   query = account.role === "Club" ? query.eq("club_id", account.clubId!).is("organizer_id", null) : query.eq("organizer_id", account.organizerId!);
@@ -55,6 +57,8 @@ export async function fetchMyLeagues(account: ClubSurfaceAccount): Promise<Leagu
     categoryCount: categoryCountByLeague.get(l.id) ?? 0,
     teamCount: teamCountByLeague.get(l.id) ?? 0,
     createdAt: l.created_at,
+    logoUrl: l.logo_url,
+    coverImageUrl: l.cover_image_url,
   }));
 }
 
@@ -62,7 +66,9 @@ export async function fetchLeagueById(leagueId: string): Promise<League | null> 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("leagues")
-    .select("id, name, description, club_id, organizer_id, is_published, start_date, end_date, created_at, clubs(name, time_zone)")
+    .select(
+      "id, name, description, club_id, organizer_id, is_published, start_date, end_date, created_at, logo_url, cover_image_url, clubs(name, time_zone)"
+    )
     .eq("id", leagueId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -82,6 +88,8 @@ export async function fetchLeagueById(leagueId: string): Promise<League | null> 
     categoryCount: 0,
     teamCount: 0,
     createdAt: data.created_at,
+    logoUrl: data.logo_url,
+    coverImageUrl: data.cover_image_url,
   };
 }
 
@@ -168,4 +176,36 @@ export async function setLeaguePublished(leagueId: string, published: boolean): 
   const supabase = await createClient();
   const { error } = await supabase.from("leagues").update({ is_published: published }).eq("id", leagueId);
   if (error) throw new Error(error.message);
+}
+
+/** Reutiliza el bucket 'tournament-branding' (0023) bajo un prefijo `league-<id>/` — su policy de escritura ya es genérica (is_tournament_staff()), no hace falta un bucket propio. */
+async function uploadLeagueBranding(leagueId: string, file: File, prefix: "logo" | "cover"): Promise<string> {
+  const supabase = await createClient();
+  const ext = file.name.split(".").pop() ?? "png";
+  const path = `league-${leagueId}/${prefix}-${crypto.randomUUID()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage.from("tournament-branding").upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  });
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { data } = supabase.storage.from("tournament-branding").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+export async function uploadLeagueLogo(leagueId: string, file: File): Promise<string> {
+  const url = await uploadLeagueBranding(leagueId, file, "logo");
+  const supabase = await createClient();
+  const { error } = await supabase.from("leagues").update({ logo_url: url }).eq("id", leagueId);
+  if (error) throw new Error(error.message);
+  return url;
+}
+
+export async function uploadLeagueCoverImage(leagueId: string, file: File): Promise<string> {
+  const url = await uploadLeagueBranding(leagueId, file, "cover");
+  const supabase = await createClient();
+  const { error } = await supabase.from("leagues").update({ cover_image_url: url }).eq("id", leagueId);
+  if (error) throw new Error(error.message);
+  return url;
 }

@@ -7,7 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { cancelMatchAction, pauseMatchAction, resumeMatchAction, setMatchCourtAction, startMatchAction } from "../application/matchActions";
+import {
+  cancelMatchAction,
+  pauseMatchAction,
+  resumeMatchAction,
+  setMatchCourtAction,
+  startMatchAction,
+  submitMatchResultAction,
+} from "../application/matchActions";
 import { MatchScoreboard } from "./match-scoreboard";
 import { MATCH_DISPLAY_STATUS_META, matchDisplayStatus, type MatchListItem } from "../domain/match";
 import { formatZonedTime } from "@/lib/timezone";
@@ -177,13 +184,12 @@ export function MatchCard({
       )}
 
       <MatchScoreboard
-        tournamentId={match.tournamentId}
-        matchId={match.id}
         teamA={match.teamA}
         teamB={match.teamB}
         scoringConfig={match.scoringConfig}
         editable={editable}
         initialSets={match.sets}
+        onSubmit={(sets, winner) => submitMatchResultAction(match.tournamentId, match.id, match.scoringConfig, sets, winner)}
         onConfirmed={onConfirmed}
       />
 

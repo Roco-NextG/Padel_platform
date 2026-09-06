@@ -279,6 +279,8 @@ export interface Database {
           is_published: boolean;
           start_date: string | null;
           end_date: string | null;
+          logo_url: string | null;
+          cover_image_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -291,6 +293,8 @@ export interface Database {
           is_published?: boolean;
           start_date?: string | null;
           end_date?: string | null;
+          logo_url?: string | null;
+          cover_image_url?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["leagues"]["Insert"]>;
       };

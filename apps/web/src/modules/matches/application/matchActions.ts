@@ -29,16 +29,21 @@ function toRatingMatchType(dbType: "TOURNAMENT" | "COMPETITIVE" | "CASUAL" | "LE
   return dbType === "COMPETITIVE" ? "COMPETITIVE" : "TOURNAMENT";
 }
 
-export async function submitMatchResultAction(
-  tournamentId: string,
+/**
+ * Todo lo que pasa DESPUÉS del gate de autorización al confirmar un
+ * resultado — validación, guardado del marcador, eventos de rating, y
+ * avance de bracket si corresponde (categoryId solo viene no-null para
+ * partidos de Torneo con fase; para Liga siempre es null, así que
+ * reconcileBracket nunca se llama ahí). Compartido por
+ * submitMatchResultAction (Torneo) y submitLeagueMatchResultAction (Liga)
+ * para no duplicar el cálculo de rating.
+ */
+export async function applyConfirmedMatchResult(
   matchId: string,
   scoringConfigJson: ScoringConfigJson,
   sets: SetScoreInput[],
   winner: TeamSide
 ): Promise<SimpleActionState> {
-  const auth = await requireTournamentManager(tournamentId);
-  if (!auth.ok) return { error: auth.error };
-
   const validation = validateMatchResult(sets, resolveScoringConfig(scoringConfigJson), winner);
   if (!validation.valid) return { error: validation.errors[0] };
 
@@ -80,6 +85,22 @@ export async function submitMatchResultAction(
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo registrar el resultado." };
   }
+
+  return { error: null };
+}
+
+export async function submitMatchResultAction(
+  tournamentId: string,
+  matchId: string,
+  scoringConfigJson: ScoringConfigJson,
+  sets: SetScoreInput[],
+  winner: TeamSide
+): Promise<SimpleActionState> {
+  const auth = await requireTournamentManager(tournamentId);
+  if (!auth.ok) return { error: auth.error };
+
+  const result = await applyConfirmedMatchResult(matchId, scoringConfigJson, sets, winner);
+  if (result.error) return result;
 
   revalidatePath("/dashboard/partidos");
   revalidatePath(`/dashboard/torneos/${tournamentId}/cuadro`);

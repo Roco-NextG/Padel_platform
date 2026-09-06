@@ -6,7 +6,6 @@ import { Check, Plus } from "@phosphor-icons/react";
 import { validateMatchResult, type SetScoreInput } from "@padel-platform/match-engine";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { submitMatchResultAction } from "../application/matchActions";
 import { matchTeamShortLabel, type MatchTeamView, type ScoringConfig } from "../domain/match";
 
 function setWinner(a: number, b: number): "A" | "B" | null {
@@ -29,23 +28,22 @@ interface Selected {
 }
 
 export function MatchScoreboard({
-  tournamentId,
-  matchId,
   teamA,
   teamB,
   scoringConfig,
   editable,
   initialSets,
+  onSubmit,
   onConfirmed,
 }: {
-  tournamentId: string;
-  matchId: string;
   teamA: MatchTeamView | null;
   teamB: MatchTeamView | null;
   scoringConfig: ScoringConfig;
   editable: boolean;
   /** Marcador ya registrado en `set_scores` — se usa como estado inicial para partidos que se cargan ya con resultado (p. ej. Confirmados). */
   initialSets?: SetScoreInput[];
+  /** Registra el resultado — Torneo y Liga pasan cada uno su propia server action ya con el id de partido/torneo/liga aplicado, este componente no conoce esa diferencia. */
+  onSubmit: (sets: SetScoreInput[], winner: "A" | "B") => Promise<{ error: string | null }>;
   onConfirmed: () => void;
 }) {
   const digitStripId = useId();
@@ -126,7 +124,7 @@ export function MatchScoreboard({
         return;
       }
       startTransition(async () => {
-        const result = await submitMatchResultAction(tournamentId, matchId, scoringConfig, sets, winner);
+        const result = await onSubmit(sets, winner);
         if (result.error) {
           setError(result.error);
           return;
