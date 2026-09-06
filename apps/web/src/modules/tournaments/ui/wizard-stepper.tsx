@@ -3,16 +3,17 @@
 import { motion } from "motion/react";
 import { Check } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
-import { WIZARD_STEP_LABELS, type WizardStepId } from "../domain/tournament";
 
 export function WizardStepper({
   stepIds,
+  labels,
   doneMap,
   activeIndex,
   onSelect,
 }: {
-  stepIds: WizardStepId[];
-  doneMap: Record<WizardStepId, boolean>;
+  stepIds: string[];
+  labels: Record<string, string>;
+  doneMap: Record<string, boolean>;
   activeIndex: number;
   onSelect: (index: number) => void;
 }) {
@@ -52,7 +53,7 @@ export function WizardStepper({
                 {done ? <Check className="size-3" weight="bold" /> : i + 1}
               </span>
             </span>
-            <span className="hidden sm:inline">{WIZARD_STEP_LABELS[id]}</span>
+            <span className="hidden sm:inline">{labels[id]}</span>
           </button>
         );
       })}

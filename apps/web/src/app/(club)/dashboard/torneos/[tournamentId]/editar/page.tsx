@@ -11,8 +11,9 @@ import { EnrollmentPanel } from "@/modules/tournaments/ui/enrollment-panel";
 import { SponsorsManager } from "@/modules/tournaments/ui/sponsors-manager";
 import { PublishPanel } from "@/modules/tournaments/ui/publish-panel";
 import { TournamentDatosForm } from "@/modules/tournaments/ui/tournament-datos-form";
-import { TournamentWizard, type WizardStep } from "@/modules/tournaments/ui/wizard-shell";
+import { StepWizard, type WizardStep } from "@/modules/tournaments/ui/wizard-shell";
 import { categoryName } from "@/modules/tournaments/domain/category";
+import { WIZARD_STEP_LABELS } from "@/modules/tournaments/domain/tournament";
 import { Card } from "@/components/ui/card";
 
 export const metadata: Metadata = { title: "Editar torneo — Padel Platform" };
@@ -126,7 +127,7 @@ export default async function EditarTorneoPage({ params }: { params: Promise<{ t
         <TournamentStatusBadge status={tournament.status} />
       </div>
 
-      <TournamentWizard steps={steps} />
+      <StepWizard steps={steps} stepLabels={WIZARD_STEP_LABELS} />
     </div>
   );
 }
