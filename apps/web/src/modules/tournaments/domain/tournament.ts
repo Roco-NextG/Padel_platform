@@ -22,7 +22,8 @@ export interface Tournament {
   coverImageUrl: string | null;
 }
 
-export const MAX_BRANDING_BYTES = 3 * 1024 * 1024;
+/** 8MB — una foto de portada real de celular ronda 3-8MB; el límite anterior (3MB) rechazaba en silencio la mayoría de las fotos reales (el error quedaba en texto chico debajo del banner, fácil de no ver — motivo real por el que "no funcionaba" la carga de portada). */
+export const MAX_BRANDING_BYTES = 8 * 1024 * 1024;
 export const ALLOWED_BRANDING_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 const STATUS_LABELS: Record<TournamentStatus, string> = {

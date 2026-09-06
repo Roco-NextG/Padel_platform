@@ -31,31 +31,73 @@ const MATCH_LIST_SELECT = `
   set_scores(set_number, team_a_games, team_b_games, tiebreak_a, tiebreak_b)
 `;
 
-/** Todos los partidos "activos" (no terminados) de los torneos que administra esta cuenta — cross-tournament, para la pantalla Partidos. */
+const LEAGUE_MATCH_LIST_SELECT = `
+  id, league_id, league_round_id, court_id, status, is_paused, scheduled_start, scheduled_end, actual_start,
+  team_a_id, team_b_id, winner_team_id,
+  leagues(name, clubs(name, time_zone)),
+  league_rounds(order_index, category_id, league_categories(name)),
+  courts(name),
+  team_a:teams!matches_team_a_id_fkey(id, team_members(players(id, first_name, last_name))),
+  team_b:teams!matches_team_b_id_fkey(id, team_members(players(id, first_name, last_name))),
+  set_scores(set_number, team_a_games, team_b_games, tiebreak_a, tiebreak_b)
+`;
+
+const ACTIVE_STATUSES = ["SCHEDULED", "IN_PROGRESS", "PENDING_CONFIRMATION", "DISPUTED", "CANCELLED", "CONFIRMED"] as const;
+
+/** Todos los partidos "activos" (no terminados) de los torneos Y ligas que administra esta cuenta — cross-torneo/liga, para la pantalla Partidos. */
 export async function fetchManagedMatches(account: ClubSurfaceAccount): Promise<MatchListItem[]> {
   const supabase = await createClient();
+
   let tournamentQuery = supabase.from("tournaments").select("id");
   tournamentQuery =
     account.role === "Club"
       ? tournamentQuery.eq("club_id", account.clubId!).is("organizer_id", null)
       : tournamentQuery.eq("organizer_id", account.organizerId!);
-  const { data: tournaments, error: tournamentsError } = await tournamentQuery;
+  let leagueQuery = supabase.from("leagues").select("id");
+  leagueQuery =
+    account.role === "Club"
+      ? leagueQuery.eq("club_id", account.clubId!).is("organizer_id", null)
+      : leagueQuery.eq("organizer_id", account.organizerId!);
+
+  const [{ data: tournaments, error: tournamentsError }, { data: leagues, error: leaguesError }] = await Promise.all([
+    tournamentQuery,
+    leagueQuery,
+  ]);
   if (tournamentsError) throw new Error(tournamentsError.message);
+  if (leaguesError) throw new Error(leaguesError.message);
   const tournamentIds = (tournaments ?? []).map((t) => t.id);
-  if (tournamentIds.length === 0) return [];
+  const leagueIds = (leagues ?? []).map((l) => l.id);
+  if (tournamentIds.length === 0 && leagueIds.length === 0) return [];
 
-  const { data, error } = await supabase
-    .from("matches")
-    .select(MATCH_LIST_SELECT)
-    .in("tournament_id", tournamentIds)
-    .in("status", ["SCHEDULED", "IN_PROGRESS", "PENDING_CONFIRMATION", "DISPUTED", "CANCELLED", "CONFIRMED"])
-    .not("team_a_id", "is", null)
-    .not("team_b_id", "is", null)
-    .order("scheduled_start", { ascending: true, nullsFirst: false })
-    .order("created_at");
-  if (error) throw new Error(error.message);
+  const [tournamentMatches, leagueMatches] = await Promise.all([
+    tournamentIds.length
+      ? supabase
+          .from("matches")
+          .select(MATCH_LIST_SELECT)
+          .in("tournament_id", tournamentIds)
+          .in("status", ACTIVE_STATUSES)
+          .not("team_a_id", "is", null)
+          .not("team_b_id", "is", null)
+      : Promise.resolve({ data: [], error: null }),
+    leagueIds.length
+      ? supabase
+          .from("matches")
+          .select(LEAGUE_MATCH_LIST_SELECT)
+          .in("league_id", leagueIds)
+          .in("status", ACTIVE_STATUSES)
+          .not("team_a_id", "is", null)
+          .not("team_b_id", "is", null)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (tournamentMatches.error) throw new Error(tournamentMatches.error.message);
+  if (leagueMatches.error) throw new Error(leagueMatches.error.message);
 
-  return mapMatchRows(data);
+  return [...mapMatchRows(tournamentMatches.data), ...mapLeagueMatchRows(leagueMatches.data)].sort((a, b) => {
+    if (a.scheduledStart === null && b.scheduledStart === null) return 0;
+    if (a.scheduledStart === null) return 1;
+    if (b.scheduledStart === null) return -1;
+    return a.scheduledStart.localeCompare(b.scheduledStart);
+  });
 }
 
 /** Todos los partidos reales (sin placeholders de bye) de UN torneo — para el planificador, incluye también los ya CONFIRMED/CANCELLED para poder mostrarlos "locked" en el calendario. */
@@ -106,6 +148,7 @@ function mapMatchRows(rows: any[] | null): MatchListItem[] {
   return (rows ?? []).map((m) => ({
     id: m.id,
     tournamentId: m.tournament_id,
+    leagueId: null,
     tournamentName: m.tournaments?.name ?? "?",
     clubName: m.tournaments?.clubs?.name ?? "?",
     clubTimeZone: m.tournaments?.clubs?.time_zone ?? DEFAULT_TIME_ZONE,
@@ -123,6 +166,34 @@ function mapMatchRows(rows: any[] | null): MatchListItem[] {
     teamB: toTeamView(m.team_b_id, m.team_b?.team_members),
     winnerTeamId: m.winner_team_id,
     scoringConfig: resolveScoringConfig(m.tournaments?.scoring_config ?? {}),
+    sets: mapSets(m.set_scores),
+  }));
+}
+
+/** Liga no tiene scoring_config propio (ver leagueMatchActions.ts) — todo partido de Liga usa el config por defecto. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapLeagueMatchRows(rows: any[] | null): MatchListItem[] {
+  return (rows ?? []).map((m) => ({
+    id: m.id,
+    tournamentId: null,
+    leagueId: m.league_id,
+    tournamentName: m.leagues?.name ?? "?",
+    clubName: m.leagues?.clubs?.name ?? "?",
+    clubTimeZone: m.leagues?.clubs?.time_zone ?? DEFAULT_TIME_ZONE,
+    categoryName: m.league_rounds?.league_categories?.name ?? "?",
+    phaseLabel: m.league_rounds ? `Jornada ${m.league_rounds.order_index + 1}` : "?",
+    groupName: null,
+    courtId: m.court_id,
+    courtName: m.courts?.name ?? null,
+    status: m.status,
+    isPaused: m.is_paused,
+    scheduledStart: m.scheduled_start,
+    scheduledEnd: m.scheduled_end,
+    actualStart: m.actual_start,
+    teamA: toTeamView(m.team_a_id, m.team_a?.team_members),
+    teamB: toTeamView(m.team_b_id, m.team_b?.team_members),
+    winnerTeamId: m.winner_team_id,
+    scoringConfig: resolveScoringConfig({}),
     sets: mapSets(m.set_scores),
   }));
 }

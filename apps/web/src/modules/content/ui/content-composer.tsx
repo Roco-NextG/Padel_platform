@@ -43,6 +43,86 @@ function itemPreviewLabel(item: ContentItem): string {
   return `Resumen · ${item.results.length} resultados`;
 }
 
+/**
+ * Convierte un color oklab(...) a rgba() vía la fórmula de referencia de
+ * Björn Ottosson (creador de OKLab) — html2canvas no entiende oklab/oklch
+ * en absoluto ("Attempting to parse an unsupported color function"), y
+ * Tailwind v4 genera sus utilidades de gradiente (bg-gradient-to-b, from-,
+ * via-, to-) en ese espacio de color por default. getComputedStyle() en navegadores
+ * modernos devuelve el color TAL CUAL se especificó (ya no lo normaliza a
+ * rgb), así que no hay atajo del navegador para esto — hay que calcularlo.
+ */
+function oklabToRgba(match: string): string {
+  // oklch(L C H / alpha) es el mismo espacio en coordenadas polares — se
+  // convierte primero a (L, a, b) cartesiano y de ahí sigue la misma cuenta.
+  const asOklch = match.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+(-?[\d.]+)\s*(?:\/\s*([\d.]+))?\)/);
+  let L: number, a: number, b: number, alpha: number;
+  if (asOklch) {
+    L = parseFloat(asOklch[1]);
+    const c = parseFloat(asOklch[2]);
+    const h = (parseFloat(asOklch[3]) * Math.PI) / 180;
+    a = c * Math.cos(h);
+    b = c * Math.sin(h);
+    alpha = asOklch[4] !== undefined ? parseFloat(asOklch[4]) : 1;
+  } else {
+    const m = match.match(/oklab\(\s*([\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s*(?:\/\s*([\d.]+))?\)/);
+    if (!m) return match;
+    L = parseFloat(m[1]);
+    a = parseFloat(m[2]);
+    b = parseFloat(m[3]);
+    alpha = m[4] !== undefined ? parseFloat(m[4]) : 1;
+  }
+
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b;
+  const l = l_ ** 3;
+  const mm = m_ ** 3;
+  const s = s_ ** 3;
+
+  let r = 4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s;
+  let g = -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s;
+  let bl = -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s;
+  const toSrgb = (c: number) => {
+    c = Math.max(0, Math.min(1, c));
+    return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  };
+  r = toSrgb(r);
+  g = toSrgb(g);
+  bl = toSrgb(bl);
+  return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(bl * 255)}, ${alpha})`;
+}
+
+/**
+ * Copia el estilo YA COMPUTADO de cada elemento del nodo real como inline
+ * style en su correspondiente nodo clonado — necesario porque html2canvas
+ * lee document.styleSheets con su propio parser (viejo, sin soporte de
+ * @layer), y el CSS de Tailwind v4 viene envuelto en @layer base/@layer
+ * utilities: confirmado en vivo que html2canvas no aplicaba NINGUNA clase
+ * de Tailwind al capturar (todo el texto salía sin estilo, apilado arriba a
+ * la izquierda, aunque el fondo — que es un style inline, no una clase —
+ * sí se veía bien). Con todo ya inline, html2canvas no necesita entender el
+ * stylesheet para nada. Los valores que salgan en oklab() se sanean aparte
+ * (ver oklabToRgba) porque ESE parser sí throwea con ellos en vez de
+ * ignorarlos en silencio.
+ */
+function inlineComputedStyles(source: Element, target: Element) {
+  const computed = getComputedStyle(source);
+  let cssText = "";
+  for (let i = 0; i < computed.length; i++) {
+    const prop = computed[i];
+    let value = computed.getPropertyValue(prop);
+    if (value.includes("oklab") || value.includes("oklch")) {
+      value = value.replace(/okl(?:ab|ch)\([^)]*\)/g, oklabToRgba);
+    }
+    cssText += `${prop}:${value};`;
+  }
+  (target as HTMLElement).style.cssText = cssText;
+  for (let i = 0; i < source.children.length; i++) {
+    if (target.children[i]) inlineComputedStyles(source.children[i], target.children[i]);
+  }
+}
+
 async function captureNode(node: HTMLElement, background: string | null): Promise<Blob | null> {
   const { default: html2canvas } = await import("html2canvas");
   const canvas = await html2canvas(node, {
@@ -58,6 +138,7 @@ async function captureNode(node: HTMLElement, background: string | null): Promis
     // ancestro/descendiente del nodo a exportar, sin tocar la cascada real (los ancestros se
     // preservan intactos para que herencia/variables CSS sigan resolviendo bien).
     ignoreElements: (el) => !(node.contains(el) || el.contains(node)),
+    onclone: (_doc, clonedNode) => inlineComputedStyles(node, clonedNode),
   });
   return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/png"));
 }

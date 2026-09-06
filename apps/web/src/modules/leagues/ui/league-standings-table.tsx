@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { LeagueStandingsEntry } from "../domain/standings";
 
-const GRID_COLS = "grid-cols-[32px_1fr_36px_36px_56px_56px_100px]";
+const GRID_COLS = "grid-cols-[32px_1fr_36px_36px_64px_56px_56px_100px]";
 
 function SignedStat({ value }: { value: number }) {
   return (
@@ -56,6 +56,7 @@ export function LeagueStandingsTable({ entries }: { entries: LeagueStandingsEntr
         <span>Pareja</span>
         <span className="text-center">PJ</span>
         <span className="text-center">PG</span>
+        <span className="text-center">Juegos</span>
         <span className="text-center">Sets</span>
         <span className="text-center">DG</span>
         <span className="text-center">Forma</span>
@@ -91,6 +92,9 @@ export function LeagueStandingsTable({ entries }: { entries: LeagueStandingsEntr
             </div>
             <span className="text-center text-[13px] tabular-nums text-muted-foreground">{e.matchesPlayed}</span>
             <span className="text-center text-[13px] font-semibold tabular-nums text-foreground">{e.matchesWon}</span>
+            <span className="text-center text-[12px] tabular-nums text-muted-foreground">
+              {e.gamesWon}-{e.gamesLost}
+            </span>
             <span className="text-center text-[13px] font-semibold">
               <SignedStat value={e.setDiff} />
             </span>

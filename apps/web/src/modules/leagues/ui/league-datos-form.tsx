@@ -2,7 +2,7 @@
 
 import { useActionState, useRef, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
-import { Camera, PencilSimple, Trophy } from "@phosphor-icons/react";
+import { Camera, CircleNotch, PencilSimple, Trophy } from "@phosphor-icons/react";
 import { updateLeagueAction, type UpdateLeagueState } from "../application/leagueWizardActions";
 import { updateLeagueCoverImageAction, updateLeagueLogoAction } from "../application/leagueBrandingActions";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,7 @@ function LeagueBanner({ league }: { league: League }) {
           className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full bg-surface/90 text-foreground shadow-sm transition-colors hover:bg-surface"
           aria-label="Subir imagen de portada"
         >
-          <Camera className="size-4" />
+          {isPending ? <CircleNotch className="size-4 animate-spin" /> : <Camera className="size-4" />}
         </button>
         <input
           ref={coverInputRef}
@@ -110,7 +110,7 @@ function LeagueBanner({ league }: { league: League }) {
                 className="absolute -bottom-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full border-2 border-background bg-inverse text-inverse-foreground"
                 aria-label="Subir logo de la liga"
               >
-                <PencilSimple className="size-2.5" />
+                {isPending ? <CircleNotch className="size-2.5 animate-spin" /> : <PencilSimple className="size-2.5" />}
               </button>
               <input
                 ref={logoInputRef}
@@ -127,7 +127,7 @@ function LeagueBanner({ league }: { league: League }) {
           </div>
         </div>
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <Alert tone="error">{error}</Alert>}
     </div>
   );
 }

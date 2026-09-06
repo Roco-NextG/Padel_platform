@@ -22,13 +22,17 @@ export interface MatchTeamView {
 
 export interface MatchListItem {
   id: string;
-  tournamentId: string;
+  /** Exactamente uno de tournamentId/leagueId es no-null — el mismo partido nunca pertenece a ambos (matches_not_both_tournament_and_league, 0026). */
+  tournamentId: string | null;
+  leagueId: string | null;
+  /** Nombre del torneo O de la liga dueña de este partido, según cuál de los dos ids arriba no sea null. */
   tournamentName: string;
-  /** Club donde se organiza el torneo — necesario para cuentas Organizador, que operan en varios clubes distintos. */
+  /** Club donde se organiza el torneo/liga — necesario para cuentas Organizador, que operan en varios clubes distintos. */
   clubName: string;
   /** Zona horaria del club donde se juega ESTE partido — nunca la del que mira la pantalla, un torneo alojado en otra sede se muestra en su propia hora local. */
   clubTimeZone: string;
   categoryName: string;
+  /** Tipo de fase de Torneo, o "Jornada N" para un partido de Liga. */
   phaseLabel: string;
   groupName: string | null;
   courtId: string | null;
