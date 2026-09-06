@@ -339,11 +339,13 @@ export function LeagueEnrollmentPanel({
   leagueId,
   categoryId,
   categoryGender,
+  categoryLabel,
   teams: initialTeams,
 }: {
   leagueId: string;
   categoryId: string;
   categoryGender: "MALE" | "FEMALE" | "MIXED";
+  categoryLabel: string;
   teams: TeamWithPlayers[];
 }) {
   const [teams, setTeams] = useState(initialTeams);
@@ -366,6 +368,19 @@ export function LeagueEnrollmentPanel({
 
   return (
     <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-foreground">{categoryLabel}</span>
+        <button
+          type="button"
+          onClick={() => setShowAdd(true)}
+          aria-label="Agregar pareja"
+          title="Agregar pareja"
+          className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border-strong text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+        >
+          <UserPlus className="size-3.5" />
+        </button>
+      </div>
+
       <AnimatePresence initial={false}>
         {teams.map((team) => (
           <motion.div
@@ -414,9 +429,9 @@ export function LeagueEnrollmentPanel({
         ))}
       </AnimatePresence>
 
-      {teams.length === 0 && <p className="text-xs text-muted-foreground">Sin parejas inscritas todavía.</p>}
+      {teams.length === 0 && !showAdd && <p className="text-xs text-muted-foreground">Sin parejas inscritas todavía.</p>}
 
-      {showAdd ? (
+      {showAdd && (
         <AddTeamForm
           leagueId={leagueId}
           categoryId={categoryId}
@@ -426,11 +441,6 @@ export function LeagueEnrollmentPanel({
             setShowAdd(false);
           }}
         />
-      ) : (
-        <Button type="button" size="sm" variant="secondary" onClick={() => setShowAdd(true)} className="self-start gap-1.5">
-          <UserPlus className="size-4" />
-          Agregar pareja
-        </Button>
       )}
     </div>
   );

@@ -61,13 +61,11 @@ export default async function EditarLigaPage({ params }: { params: Promise<{ lea
           ) : (
             categoriesWithTeams.map(({ category, teams }) => (
               <Card key={category.id} className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">
-                  {categoryName(Number(category.level), category.genderRestriction as "MALE" | "FEMALE" | "MIXED")}
-                </span>
                 <LeagueEnrollmentPanel
                   leagueId={leagueId}
                   categoryId={category.id}
                   categoryGender={category.genderRestriction as "MALE" | "FEMALE" | "MIXED"}
+                  categoryLabel={categoryName(Number(category.level), category.genderRestriction as "MALE" | "FEMALE" | "MIXED")}
                   teams={teams}
                 />
               </Card>

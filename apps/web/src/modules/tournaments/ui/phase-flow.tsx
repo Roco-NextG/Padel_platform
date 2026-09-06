@@ -137,7 +137,16 @@ export function PhaseFlow({
     // el snap se reactivaba a mitad de camino y frenaba el scroll ahí).
     container.addEventListener("scrollend", restoreSnap, { once: true });
     window.setTimeout(restoreSnap, 1200);
-    container.scrollTo({ left: el.offsetLeft, behavior: "smooth" });
+    // el.offsetLeft es relativo al offsetParent de el, que acá termina
+    // siendo <body> (ningún ancestro entre la sección y el body tiene
+    // position != static) — no el contenedor con scroll. Eso hacía que el
+    // destino calculado incluyera el ancho del sidebar y el padding de la
+    // página, aterrizando sistemáticamente una fase más allá de la
+    // clickeada (confirmado en vivo: offsetParent de cada sección era
+    // BODY). getBoundingClientRect() da la posición real relativa al
+    // contenedor, sin depender de la cadena de offsetParent.
+    const targetLeft = el.getBoundingClientRect().left - container.getBoundingClientRect().left + container.scrollLeft;
+    container.scrollTo({ left: targetLeft, behavior: "smooth" });
   }
 
   if (sections.length === 0) return null;

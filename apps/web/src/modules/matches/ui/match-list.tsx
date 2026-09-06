@@ -81,7 +81,7 @@ export function MatchList({
               <motion.div key={m.id} layout initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}>
                 <MatchCard
                   match={m}
-                  courts={courtsByTournamentId[m.tournamentId] ?? []}
+                  courts={(m.tournamentId && courtsByTournamentId[m.tournamentId]) || []}
                   showTournamentName={showTournamentName}
                   onUpdate={(patch) => setMatches((prev) => prev.map((x) => (x.id === m.id ? { ...x, ...patch } : x)))}
                   onConfirmed={() => setMatches((prev) => prev.map((x) => (x.id === m.id ? { ...x, status: "CONFIRMED" } : x)))}

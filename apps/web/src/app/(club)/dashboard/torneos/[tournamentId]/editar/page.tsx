@@ -82,13 +82,11 @@ export default async function EditarTorneoPage({ params }: { params: Promise<{ t
           ) : (
             categoriesWithTeams.map(({ category, teams }) => (
               <Card key={category.id} className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">
-                  {categoryName(Number(category.level), category.genderRestriction as "MALE" | "FEMALE" | "MIXED")}
-                </span>
                 <EnrollmentPanel
                   tournamentId={tournamentId}
                   categoryId={category.id}
                   categoryGender={category.genderRestriction as "MALE" | "FEMALE" | "MIXED"}
+                  categoryLabel={categoryName(Number(category.level), category.genderRestriction as "MALE" | "FEMALE" | "MIXED")}
                   teams={teams}
                 />
               </Card>

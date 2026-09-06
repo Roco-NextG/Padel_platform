@@ -15,9 +15,10 @@ import {
   startMatchAction,
   submitMatchResultAction,
 } from "../application/matchActions";
+import { submitLeagueMatchResultAction } from "@/modules/leagues/application/leagueMatchActions";
 import { MatchScoreboard } from "./match-scoreboard";
 import { MATCH_DISPLAY_STATUS_META, matchDisplayStatus, type MatchListItem } from "../domain/match";
-import { formatZonedTime } from "@/lib/timezone";
+import { formatZonedDate, formatZonedTime } from "@/lib/timezone";
 
 /** Borde/sombra por estado visual — mismo criterio que .match-card en padel-platform.html (live=glow, paused/disputed=borde izquierdo de color, cancelled=atenuado). */
 const CARD_TREATMENT: Record<string, string> = {
@@ -30,6 +31,12 @@ const CARD_TREATMENT: Record<string, string> = {
 function formatTime(iso: string | null, timeZone: string): string {
   if (!iso) return "";
   return formatZonedTime(iso, timeZone);
+}
+
+/** Fecha corta + hora — un partido "próximo" solo mostraba la hora, sin decir de qué día, ambiguo apenas la grilla cruza medianoche. */
+function formatDateTime(iso: string | null, timeZone: string): string {
+  if (!iso) return "";
+  return `${formatZonedDate(iso, { day: "numeric", month: "short" }, timeZone)} · ${formatZonedTime(iso, timeZone)}`;
 }
 
 export function MatchCard({
@@ -62,7 +69,10 @@ export function MatchCard({
 
   const displayStatus = matchDisplayStatus(match);
   const meta = MATCH_DISPLAY_STATUS_META[displayStatus];
-  const editable = displayStatus === "LIVE" || displayStatus === "PAUSED" || displayStatus === "DISPUTED";
+  // Liga no tiene "Iniciar partido" (sin startMatchAction propio todavía) — submit_match_result
+  // ya acepta un partido SCHEDULED directo, así que el marcador se habilita de una sin ese paso.
+  const isLeague = match.tournamentId === null;
+  const editable = displayStatus === "LIVE" || displayStatus === "PAUSED" || displayStatus === "DISPUTED" || (isLeague && displayStatus === "UPCOMING");
 
   const timeText =
     displayStatus === "LIVE" || displayStatus === "PAUSED"
@@ -70,13 +80,14 @@ export function MatchCard({
         ? `Desde ${formatTime(match.actualStart, match.clubTimeZone)}`
         : ""
       : displayStatus === "UPCOMING"
-        ? formatTime(match.scheduledStart, match.clubTimeZone)
+        ? formatDateTime(match.scheduledStart, match.clubTimeZone)
         : "";
 
+  // Estos 5 handlers solo son alcanzables desde botones ya condicionados a !isLeague — el "!" es seguro acá, Liga no tiene estas acciones todavía.
   function handleStart() {
     setMenuOpen(false);
     startTransition(async () => {
-      const result = await startMatchAction(match.tournamentId, match.id);
+      const result = await startMatchAction(match.tournamentId!, match.id);
       if (!result.error) onUpdate({ status: "IN_PROGRESS", actualStart: new Date().toISOString() });
     });
   }
@@ -84,7 +95,7 @@ export function MatchCard({
   function handlePause() {
     setMenuOpen(false);
     startTransition(async () => {
-      const result = await pauseMatchAction(match.tournamentId, match.id);
+      const result = await pauseMatchAction(match.tournamentId!, match.id);
       if (!result.error) onUpdate({ isPaused: true });
     });
   }
@@ -92,7 +103,7 @@ export function MatchCard({
   function handleResume() {
     setMenuOpen(false);
     startTransition(async () => {
-      const result = await resumeMatchAction(match.tournamentId, match.id);
+      const result = await resumeMatchAction(match.tournamentId!, match.id);
       if (!result.error) onUpdate({ isPaused: false });
     });
   }
@@ -100,7 +111,7 @@ export function MatchCard({
   function handleCancel() {
     setMenuOpen(false);
     startTransition(async () => {
-      const result = await cancelMatchAction(match.tournamentId, match.id);
+      const result = await cancelMatchAction(match.tournamentId!, match.id);
       if (!result.error) onUpdate({ status: "CANCELLED" });
     });
   }
@@ -110,7 +121,7 @@ export function MatchCard({
     setChangingCourt(false);
     onUpdate({ courtId: newCourtId, courtName: courts.find((c) => c.id === newCourtId)?.name ?? null });
     startTransition(async () => {
-      await setMatchCourtAction(match.tournamentId, match.id, newCourtId);
+      await setMatchCourtAction(match.tournamentId!, match.id, newCourtId);
     });
   }
 
@@ -129,40 +140,42 @@ export function MatchCard({
           {meta.label}
         </Badge>
         <span className="ml-auto text-[10.5px] tabular-nums text-muted-foreground">{timeText}</span>
-        <div className="relative" ref={menuRef}>
-          <button
-            type="button"
-            onClick={() => setMenuOpen((v) => !v)}
-            className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-secondary hover:text-foreground"
-            aria-label="Más acciones"
-          >
-            <DotsThreeVertical className="size-4" weight="bold" />
-          </button>
-          {menuOpen && (
-            <div className="absolute right-0 top-7 z-20 flex min-w-[168px] flex-col gap-0.5 rounded-md border border-border bg-surface p-1.5 shadow-lg">
-              {displayStatus === "LIVE" && (
-                <MenuButton icon={Pause} onClick={handlePause}>
-                  Pausar partido
-                </MenuButton>
-              )}
-              {displayStatus === "PAUSED" && (
-                <MenuButton icon={Play} onClick={handleResume}>
-                  Reanudar partido
-                </MenuButton>
-              )}
-              {courts.length > 0 && (
-                <MenuButton icon={MapPin} onClick={() => setChangingCourt(true)}>
-                  Cambiar pista
-                </MenuButton>
-              )}
-              {displayStatus !== "CANCELLED" && displayStatus !== "DONE" && (
-                <MenuButton icon={Prohibit} onClick={handleCancel} destructive>
-                  Cancelar partido
-                </MenuButton>
-              )}
-            </div>
-          )}
-        </div>
+        {!isLeague && (
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-secondary hover:text-foreground"
+              aria-label="Más acciones"
+            >
+              <DotsThreeVertical className="size-4" weight="bold" />
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-7 z-20 flex min-w-[168px] flex-col gap-0.5 rounded-md border border-border bg-surface p-1.5 shadow-lg">
+                {displayStatus === "LIVE" && (
+                  <MenuButton icon={Pause} onClick={handlePause}>
+                    Pausar partido
+                  </MenuButton>
+                )}
+                {displayStatus === "PAUSED" && (
+                  <MenuButton icon={Play} onClick={handleResume}>
+                    Reanudar partido
+                  </MenuButton>
+                )}
+                {courts.length > 0 && (
+                  <MenuButton icon={MapPin} onClick={() => setChangingCourt(true)}>
+                    Cambiar pista
+                  </MenuButton>
+                )}
+                {displayStatus !== "CANCELLED" && displayStatus !== "DONE" && (
+                  <MenuButton icon={Prohibit} onClick={handleCancel} destructive>
+                    Cancelar partido
+                  </MenuButton>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {changingCourt && (
@@ -189,11 +202,15 @@ export function MatchCard({
         scoringConfig={match.scoringConfig}
         editable={editable}
         initialSets={match.sets}
-        onSubmit={(sets, winner) => submitMatchResultAction(match.tournamentId, match.id, match.scoringConfig, sets, winner)}
+        onSubmit={(sets, winner) =>
+          match.tournamentId
+            ? submitMatchResultAction(match.tournamentId, match.id, match.scoringConfig, sets, winner)
+            : submitLeagueMatchResultAction(match.leagueId!, match.id, sets, winner)
+        }
         onConfirmed={onConfirmed}
       />
 
-      {displayStatus === "UPCOMING" && (
+      {!isLeague && displayStatus === "UPCOMING" && (
         <Button type="button" size="sm" loading={isPending} onClick={handleStart} className="justify-center gap-1.5">
           <Play className="size-3.5" weight="fill" />
           Iniciar partido

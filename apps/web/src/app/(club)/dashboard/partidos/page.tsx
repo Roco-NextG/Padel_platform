@@ -128,7 +128,7 @@ export default async function PartidosPage({
 
   const matches = await fetchManagedMatches(account);
 
-  const tournamentIds = [...new Set(matches.map((m) => m.tournamentId))];
+  const tournamentIds = [...new Set(matches.map((m) => m.tournamentId).filter((id): id is string => id !== null))];
   const tournamentsForMatches = await Promise.all(tournamentIds.map((id) => fetchTournamentById(id)));
   const clubIdByTournamentId = new Map(tournamentsForMatches.filter((t) => t !== null).map((t) => [t!.id, t!.clubId]));
 
