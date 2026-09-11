@@ -39,6 +39,7 @@ const CONTENT_MATCH_SELECT = `
 
 export interface ContentFeedData {
   tournamentName: string;
+  tournamentLogoUrl: string | null;
   sponsors: { id: string; name: string; logoUrl: string }[];
   items: ContentItem[];
 }
@@ -48,7 +49,7 @@ export async function fetchContentFeed(tournamentId: string): Promise<ContentFee
 
   const [{ data: tournament, error: tournamentError }, { data: sponsors, error: sponsorsError }, { data: matches, error: matchesError }] =
     await Promise.all([
-      supabase.from("tournaments").select("name, clubs(time_zone)").eq("id", tournamentId).single(),
+      supabase.from("tournaments").select("name, logo_url, clubs(time_zone)").eq("id", tournamentId).single(),
       supabase.from("sponsors").select("id, name, logo_url").eq("tournament_id", tournamentId),
       supabase
         .from("matches")
@@ -132,6 +133,7 @@ export async function fetchContentFeed(tournamentId: string): Promise<ContentFee
 
   return {
     tournamentName: tournament?.name ?? "?",
+    tournamentLogoUrl: tournament?.logo_url ?? null,
     sponsors: (sponsors ?? []).map((s) => ({ id: s.id, name: s.name, logoUrl: s.logo_url })),
     items: [...summaries, ...items],
   };
