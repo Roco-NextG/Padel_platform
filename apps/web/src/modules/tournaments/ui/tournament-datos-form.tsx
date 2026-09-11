@@ -74,11 +74,15 @@ function TournamentBanner({ tournament }: { tournament: Tournament }) {
         className="relative h-[150px] overflow-hidden rounded-lg bg-surface-secondary bg-[radial-gradient(circle_at_20%_100%,var(--color-accent-muted),transparent_65%)] bg-cover bg-center"
         style={coverImageUrl ? { backgroundImage: `url(${coverImageUrl})` } : undefined}
       >
+        {/* z-10: sin esto, el div "absolute inset-0" de más abajo (nombre/logo) pinta DESPUÉS
+            en el DOM y queda arriba en el stacking pese a que este botón se ve encima — el
+            click nunca le llegaba al botón (confirmado con elementFromPoint en el punto exacto
+            del ícono: devolvía ese div, no el botón). */}
         <button
           type="button"
           disabled={isPending}
           onClick={() => coverInputRef.current?.click()}
-          className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full bg-surface/90 text-foreground shadow-sm transition-colors hover:bg-surface"
+          className="absolute right-3 top-3 z-10 flex size-8 items-center justify-center rounded-full bg-surface/90 text-foreground shadow-sm transition-colors hover:bg-surface"
           aria-label="Subir imagen de portada"
         >
           {isPending ? <CircleNotch className="size-4 animate-spin" /> : <Camera className="size-4" />}

@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
   DownloadSimple,
   ShareNetwork,
   Copy,
+  Eye,
   CaretLeft,
   CaretRight,
   UploadSimple,
@@ -16,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
-import { GenSlide } from "./gen-slide";
+import { GenSlide, ResultSticker, ResultStickerCapture } from "./gen-slide";
 import { FORMATS, type BackgroundStyle, type ContentItem, type FormatId, type ScoreStickerStyle } from "../domain/content";
 import type { ContentFeedData } from "../infrastructure/contentRepository";
 
@@ -143,6 +144,49 @@ async function captureNode(node: HTMLElement, background: string | null): Promis
   return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/png"));
 }
 
+/**
+ * El logo que sube el club para un sponsor casi nunca viene ya preparado
+ * para pegarse sobre un fondo de color (cancha/glow/mesh/foto) — trae su
+ * propio fondo blanco (JPG, o PNG "transparente" solo de nombre). Se
+ * convierte automáticamente a una silueta blanca: cualquier píxel
+ * blanco/casi blanco pasa a alpha 0 (el fondo desaparece), y el resto se
+ * repinta blanco puro conservando su alpha original (el trazo del logo
+ * queda). Si la imagen no es CORS-friendly esto tira SecurityError al leer
+ * el canvas — se cae al logo original tal cual en vez de romper el slide.
+ */
+async function whitenizeLogo(url: string): Promise<string> {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = url;
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error("No se pudo cargar el logo"));
+  });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return url;
+  ctx.drawImage(img, 0, 0);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue; // ya transparente, no tocar
+    const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    if (luminance > 235) {
+      data[i + 3] = 0; // fondo blanco/casi blanco -> transparente
+    } else {
+      data[i] = 255;
+      data[i + 1] = 255;
+      data[i + 2] = 255; // resto del logo -> blanco puro
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
 export function ContentComposer({ feed }: { feed: ContentFeedData }) {
   const days = useMemo(() => [...new Set(feed.items.map((i) => i.dateKey))].sort().reverse(), [feed.items]);
   const [activeDay, setActiveDay] = useState<string | null>(days[0] ?? null);
@@ -164,8 +208,34 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
   const [showSponsors, setShowSponsors] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [showStickerPreview, setShowStickerPreview] = useState(false);
+  const [whiteSponsorLogos, setWhiteSponsorLogos] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    for (const s of feed.sponsors) {
+      if (whiteSponsorLogos[s.logoUrl]) continue;
+      whitenizeLogo(s.logoUrl)
+        .then((dataUrl) => {
+          if (!cancelled) setWhiteSponsorLogos((prev) => ({ ...prev, [s.logoUrl]: dataUrl }));
+        })
+        .catch(() => {
+          // CORS u otro error de carga: se sigue usando el logo original (ver sponsorsForSlide).
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feed.sponsors]);
+
+  const sponsorsForSlide = useMemo(
+    () => feed.sponsors.map((s) => ({ ...s, logoUrl: whiteSponsorLogos[s.logoUrl] ?? s.logoUrl })),
+    [feed.sponsors, whiteSponsorLogos]
+  );
 
   const slideRef = useRef<HTMLDivElement>(null);
+  const stickerRef = useRef<HTMLDivElement>(null);
   const previewBoxRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -234,7 +304,7 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
   }
 
   function handleCopySticker() {
-    if (!slideRef.current) return;
+    if (!stickerRef.current) return;
     // navigator.clipboard.write() tiene que llamarse de forma SÍNCRONA dentro del handler del
     // click para que el navegador todavía lo cuente como "gesto del usuario" (confirmado: la
     // versión anterior hacía `await captureNode(...)` ANTES de llamar a .write(), y para
@@ -242,7 +312,10 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
     // silenciosamente, o el catch mostraba "no soporta copiar imágenes" aunque sí soporte). El
     // Blob en sí puede seguir generándose async — ClipboardItem acepta una Promise<Blob> como
     // valor exactamente para este caso.
-    const node = slideRef.current;
+    // Captura stickerRef (ResultStickerCapture), NO slideRef: ese es el slide completo (fondo,
+    // logo, fecha, sponsors, watermark "Padel Platform") — un sticker pensado para pegarse sobre
+    // cualquier fondo no puede traer nada de eso, solo la franja/tarjeta/ganador en sí.
+    const node = stickerRef.current;
     setIsExporting(true);
     const blobPromise = captureNode(node, null).then((blob) => {
       if (!blob) throw new Error("No se pudo generar la imagen.");
@@ -350,7 +423,8 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
                     showLogo={showLogo}
                     showSponsors={showSponsors}
                     tournamentName={feed.tournamentName}
-                    sponsors={feed.sponsors}
+                    tournamentLogoUrl={feed.tournamentLogoUrl}
+                    sponsors={sponsorsForSlide}
                     tiktokChrome={format === "tiktok"}
                   />
                 </div>
@@ -370,10 +444,20 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
                   showLogo={showLogo}
                   showSponsors={showSponsors}
                   tournamentName={feed.tournamentName}
-                  sponsors={feed.sponsors}
+                  tournamentLogoUrl={feed.tournamentLogoUrl}
+                  sponsors={sponsorsForSlide}
                   tiktokChrome={format === "tiktok"}
                 />
               </div>
+
+              {/* Sticker aislado (franja/tarjeta/ganador solo, sin fondo ni logo ni watermark) —
+                  fuera de pantalla igual que el slide de exportación; es lo que captura
+                  "Copiar sticker" y lo que se muestra al abrir la vista previa con el ícono de ojo. */}
+              {currentSlideItem?.type === "result" && (
+                <div aria-hidden="true" className="pointer-events-none fixed left-[-9999px] top-0">
+                  <ResultStickerCapture ref={stickerRef} item={currentSlideItem} style={scoreStyle} />
+                </div>
+              )}
 
               {format === "carrusel" && slideItems.length > 1 && (
                 <div className="mt-3 flex items-center justify-center gap-3">
@@ -468,10 +552,44 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
                   </button>
                 ))}
               </div>
-              <Button type="button" variant="ghost" size="sm" onClick={handleCopySticker} loading={isExporting} className="gap-1.5 self-start">
-                <Copy className="size-3.5" />
-                Copiar sticker
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Button type="button" variant="ghost" size="sm" onClick={handleCopySticker} loading={isExporting} className="gap-1.5">
+                  <Copy className="size-3.5" />
+                  Copiar sticker
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setShowStickerPreview((v) => !v)}
+                  aria-pressed={showStickerPreview}
+                  aria-label={showStickerPreview ? "Ocultar vista previa del sticker" : "Ver el sticker que se va a copiar"}
+                  className={cn(
+                    "flex size-8 shrink-0 items-center justify-center rounded-md border transition-colors",
+                    showStickerPreview
+                      ? "border-accent bg-accent-muted text-accent-text"
+                      : "border-border text-muted-foreground hover:border-border-strong hover:text-foreground"
+                  )}
+                >
+                  <Eye className="size-3.5" />
+                </button>
+              </div>
+
+              {/* Fondo a cuadros clásico de "esto es transparente" — para que el usuario vea,
+                  antes de copiar, que alrededor de la franja/tarjeta/ganador no viaja nada más
+                  (ni fondo, ni logo, ni el nombre de la app). */}
+              {showStickerPreview && (
+                <div
+                  className="flex items-center justify-center rounded-md border border-border p-3"
+                  style={{
+                    backgroundImage:
+                      "conic-gradient(#00000022 90deg, transparent 90deg 180deg, #00000022 180deg 270deg, transparent 270deg)",
+                    backgroundSize: "16px 16px",
+                  }}
+                >
+                  <div style={{ width: 220 }} className="text-white">
+                    <ResultSticker item={currentSlideItem} style={scoreStyle} />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
