@@ -28,10 +28,13 @@ export function MatchList({
   matches: initialMatches,
   courtsByTournamentId,
   showTournamentName,
+  onMatchConfirmed,
 }: {
   matches: MatchListItem[];
   courtsByTournamentId: Record<string, { id: string; name: string }[]>;
   showTournamentName: boolean;
+  /** Además del update optimista local (siempre), avisa al padre que un partido se confirmó — para datos server-side que dependen del resultado y esta lista no conoce (ej. tabla de posiciones de Liga). */
+  onMatchConfirmed?: () => void;
 }) {
   const [matches, setMatches] = useState(initialMatches);
   const [filter, setFilter] = useState<FilterKey>("TODOS");
@@ -84,7 +87,10 @@ export function MatchList({
                   courts={(m.tournamentId && courtsByTournamentId[m.tournamentId]) || []}
                   showTournamentName={showTournamentName}
                   onUpdate={(patch) => setMatches((prev) => prev.map((x) => (x.id === m.id ? { ...x, ...patch } : x)))}
-                  onConfirmed={() => setMatches((prev) => prev.map((x) => (x.id === m.id ? { ...x, status: "CONFIRMED" } : x)))}
+                  onConfirmed={() => {
+                    setMatches((prev) => prev.map((x) => (x.id === m.id ? { ...x, status: "CONFIRMED" } : x)));
+                    onMatchConfirmed?.();
+                  }}
                 />
               </motion.div>
             ))}

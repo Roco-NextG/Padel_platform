@@ -1,19 +1,6 @@
 import { generateRoundRobinSchedule } from "@padel-platform/tournament-engine";
 import { createClient } from "@/lib/supabase/server";
 import { fetchTeamsForLeagueCategory } from "./leagueEnrollmentRepository";
-import type { MatchTeamView } from "@/modules/matches/domain/match";
-import type { SetScoreInput } from "@padel-platform/match-engine";
-import type { MatchStatus } from "@/lib/supabase/database.types";
-
-export interface LeagueMatchView {
-  id: string;
-  roundId: string;
-  teamA: MatchTeamView | null;
-  teamB: MatchTeamView | null;
-  status: MatchStatus;
-  winnerTeamId: string | null;
-  sets: SetScoreInput[];
-}
 
 /** Reparte el rango de fechas de la liga en `count` ventanas iguales — null si la liga no tiene ambas fechas cargadas (el campo es opcional). */
 function computeRoundWindows(
@@ -87,53 +74,4 @@ export async function generateLeagueSchedule(leagueId: string, categoryId: strin
     const { error: matchesError } = await supabase.from("matches").insert(rows);
     if (matchesError) throw new Error(matchesError.message);
   }
-}
-
-export async function fetchLeagueMatchesForCategory(categoryId: string): Promise<LeagueMatchView[]> {
-  const supabase = await createClient();
-  const { data: rounds } = await supabase.from("league_rounds").select("id").eq("category_id", categoryId);
-  const roundIds = (rounds ?? []).map((r) => r.id);
-  if (roundIds.length === 0) return [];
-
-  const { data, error } = await supabase
-    .from("matches")
-    .select(
-      `id, league_round_id, status, winner_team_id,
-       team_a:teams!matches_team_a_id_fkey(id, team_members(players(id, first_name, last_name))),
-       team_b:teams!matches_team_b_id_fkey(id, team_members(players(id, first_name, last_name))),
-       set_scores(set_number, team_a_games, team_b_games, tiebreak_a, tiebreak_b)`
-    )
-    .in("league_round_id", roundIds)
-    .order("round_index");
-  if (error) throw new Error(error.message);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function toTeamView(team: any): MatchTeamView | null {
-    if (!team) return null;
-    const members = (team.team_members ?? []) as { players: { id: string; first_name: string; last_name: string } | null }[];
-    return {
-      teamId: team.id,
-      players: members.filter((m) => m.players).map((m) => ({ playerId: m.players!.id, firstName: m.players!.first_name, lastName: m.players!.last_name })),
-    };
-  }
-
-  interface SetScoreRow {
-    set_number: number;
-    team_a_games: number;
-    team_b_games: number;
-    tiebreak_a: number | null;
-    tiebreak_b: number | null;
-  }
-
-  return (data ?? []).map((m) => ({
-    id: m.id,
-    roundId: m.league_round_id!,
-    teamA: toTeamView(m.team_a),
-    teamB: toTeamView(m.team_b),
-    status: m.status,
-    winnerTeamId: m.winner_team_id,
-    sets: [...((m.set_scores as unknown as SetScoreRow[]) ?? [])]
-      .sort((a, b) => a.set_number - b.set_number)
-      .map((s) => ({ setNumber: s.set_number, teamAGames: s.team_a_games, teamBGames: s.team_b_games, tiebreakA: s.tiebreak_a, tiebreakB: s.tiebreak_b })),
-  }));
 }

@@ -8,19 +8,19 @@ import { cn } from "@/lib/utils";
 import { categoryName } from "@/modules/tournaments/domain/category";
 import { LeagueProgressCard } from "./league-progress-card";
 import { LeagueStandingsTable } from "./league-standings-table";
-import { LeagueMatchCard } from "./league-match-card";
 import { GenerateLeagueScheduleButton } from "./generate-league-schedule-button";
+import { MatchList } from "@/modules/matches/ui/match-list";
 import { Card } from "@/components/ui/card";
 import type { LeagueCategory } from "../domain/leagueCategory";
 import type { LeagueStandingsEntry } from "../domain/standings";
 import type { LeagueRoundView } from "../infrastructure/leagueStandingsRepository";
-import type { LeagueMatchView } from "../infrastructure/leagueScheduleRepository";
+import type { MatchListItem } from "@/modules/matches/domain/match";
 
 export interface LeagueCategoryData {
   category: LeagueCategory;
   standings: LeagueStandingsEntry[];
   rounds: LeagueRoundView[];
-  matches: LeagueMatchView[];
+  matches: MatchListItem[];
   teamCount: number;
 }
 
@@ -42,7 +42,7 @@ export function LeagueScreen({ leagueId, categoriesData }: { leagueId: string; c
 
   const selectedRoundId = roundId && data?.rounds.some((r) => r.id === roundId) ? roundId : defaultRoundId;
   const matchesForRound = useMemo(
-    () => (data ? data.matches.filter((m) => m.roundId === selectedRoundId) : []),
+    () => (data ? data.matches.filter((m) => m.leagueRoundId === selectedRoundId) : []),
     [data, selectedRoundId]
   );
 
@@ -149,11 +149,16 @@ export function LeagueScreen({ leagueId, categoriesData }: { leagueId: string; c
               {formatWindow(data.rounds.find((r) => r.id === selectedRoundId)) && (
                 <p className="text-[11px] text-muted-foreground">{formatWindow(data.rounds.find((r) => r.id === selectedRoundId))}</p>
               )}
-              <div className="flex flex-col gap-2.5">
-                {matchesForRound.map((m) => (
-                  <LeagueMatchCard key={m.id} leagueId={leagueId} match={m} onConfirmed={handleConfirmed} />
-                ))}
-              </div>
+              {/* key=selectedRoundId: MatchList guarda su propia copia de `matches` en useState — sin
+                  la key, cambiar de jornada no se reflejaría (el estado interno solo se inicializa
+                  una vez), la misma trampa ya documentada en category-grid/scheduler-board. */}
+              <MatchList
+                key={selectedRoundId}
+                matches={matchesForRound}
+                courtsByTournamentId={{}}
+                showTournamentName={false}
+                onMatchConfirmed={handleConfirmed}
+              />
             </div>
           )}
         </>

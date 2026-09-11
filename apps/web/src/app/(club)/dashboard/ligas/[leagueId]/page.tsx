@@ -5,7 +5,7 @@ import { getLeague } from "@/modules/leagues/application/getLeagues";
 import { fetchLeagueCategories } from "@/modules/leagues/infrastructure/leagueRepository";
 import { fetchTeamsForLeagueCategory } from "@/modules/leagues/infrastructure/leagueEnrollmentRepository";
 import { fetchLeagueRounds, fetchLeagueStandings } from "@/modules/leagues/infrastructure/leagueStandingsRepository";
-import { fetchLeagueMatchesForCategory } from "@/modules/leagues/infrastructure/leagueScheduleRepository";
+import { fetchMatchesForLeagueCategory } from "@/modules/matches/infrastructure/matchRepository";
 import { LeagueScreen, type LeagueCategoryData } from "@/modules/leagues/ui/league-screen";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -26,7 +26,7 @@ export default async function LigaPage({ params }: { params: Promise<{ leagueId:
         fetchTeamsForLeagueCategory(category.id),
         fetchLeagueStandings(category.id),
         fetchLeagueRounds(category.id),
-        fetchLeagueMatchesForCategory(category.id),
+        fetchMatchesForLeagueCategory(category.id),
       ]);
       return { category, standings, rounds, matches, teamCount: teams.length };
     })

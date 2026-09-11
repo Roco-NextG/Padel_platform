@@ -130,6 +130,22 @@ export async function fetchMatchesForCategory(categoryId: string): Promise<Match
   return mapMatchRows(data);
 }
 
+/** Partidos de UNA categoría de Liga (todas las jornadas) en la misma forma `MatchListItem` que usa la pantalla de Partidos — así la vista de Jornadas de Liga muestra exactamente la misma card (MatchCard/MatchList), sin un componente propio más liviano. */
+export async function fetchMatchesForLeagueCategory(categoryId: string): Promise<MatchListItem[]> {
+  const supabase = await createClient();
+  const { data: rounds } = await supabase.from("league_rounds").select("id").eq("category_id", categoryId);
+  const roundIds = (rounds ?? []).map((r) => r.id);
+  if (roundIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("matches")
+    .select(LEAGUE_MATCH_LIST_SELECT)
+    .in("league_round_id", roundIds)
+    .order("round_index");
+  if (error) throw new Error(error.message);
+  return mapLeagueMatchRows(data);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapSets(raw: any[] | null | undefined): SetScoreInput[] {
   return [...(raw ?? [])]
@@ -149,6 +165,7 @@ function mapMatchRows(rows: any[] | null): MatchListItem[] {
     id: m.id,
     tournamentId: m.tournament_id,
     leagueId: null,
+    leagueRoundId: null,
     tournamentName: m.tournaments?.name ?? "?",
     clubName: m.tournaments?.clubs?.name ?? "?",
     clubTimeZone: m.tournaments?.clubs?.time_zone ?? DEFAULT_TIME_ZONE,
@@ -177,6 +194,7 @@ function mapLeagueMatchRows(rows: any[] | null): MatchListItem[] {
     id: m.id,
     tournamentId: null,
     leagueId: m.league_id,
+    leagueRoundId: m.league_round_id,
     tournamentName: m.leagues?.name ?? "?",
     clubName: m.leagues?.clubs?.name ?? "?",
     clubTimeZone: m.leagues?.clubs?.time_zone ?? DEFAULT_TIME_ZONE,
