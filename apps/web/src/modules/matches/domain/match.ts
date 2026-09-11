@@ -25,6 +25,8 @@ export interface MatchListItem {
   /** Exactamente uno de tournamentId/leagueId es no-null — el mismo partido nunca pertenece a ambos (matches_not_both_tournament_and_league, 0026). */
   tournamentId: string | null;
   leagueId: string | null;
+  /** Solo no-null para un partido de Liga — la jornada (`league_rounds.id`) a la que pertenece, usado para agrupar/filtrar por jornada en la pantalla de Liga. */
+  leagueRoundId: string | null;
   /** Nombre del torneo O de la liga dueña de este partido, según cuál de los dos ids arriba no sea null. */
   tournamentName: string;
   /** Club donde se organiza el torneo/liga — necesario para cuentas Organizador, que operan en varios clubes distintos. */
