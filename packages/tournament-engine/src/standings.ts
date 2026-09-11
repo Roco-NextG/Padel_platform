@@ -3,14 +3,16 @@ import { GroupStanding, MatchResult, TeamId } from "./types";
 /**
  * Calcula la clasificación de un grupo.
  *
- * Orden de desempate confirmado (04_TOURNAMENT_ENGINE.md §3):
+ * Orden de desempate (revisado — decisión explícita del usuario: el total de
+ * juegos ganados premiaba a quien jugó más partidos/games, no a quien jugó
+ * mejor. Ahora el desempate depende solo de diferencias, sin importar
+ * cuántos sets o games se jugaron):
  *   0. Partidos ganados (criterio de agrupación primario)
- *   1. Juegos ganados (total)
- *   2. Diferencia de sets
- *   3. Diferencia de games
- *   4. Enfrentamiento directo (solo resuelve empates de exactamente 2 equipos)
+ *   1. Diferencia de sets
+ *   2. Diferencia de games
+ *   3. Enfrentamiento directo (solo resuelve empates de exactamente 2 equipos)
  *
- * Si tras estos 5 pasos sigue habiendo empate (3+ equipos, o head-to-head
+ * Si tras estos 4 pasos sigue habiendo empate (3+ equipos, o head-to-head
  * también empatado), esos equipos quedan marcados con
  * `requiresManualResolution = true` y el orden entre ellos no se garantiza
  * — el organizador resuelve manualmente (sección 3 del spec).
@@ -81,7 +83,6 @@ export function compareStandings(
   headToHead: Map<string, MatchResult>
 ): number {
   if (x.matchesWon !== y.matchesWon) return y.matchesWon - x.matchesWon;
-  if (x.gamesWon !== y.gamesWon) return y.gamesWon - x.gamesWon;
   if (x.setDiff !== y.setDiff) return y.setDiff - x.setDiff;
   if (x.gameDiff !== y.gameDiff) return y.gameDiff - x.gameDiff;
   const h2h = headToHead.get(pairKey(x.teamId, y.teamId));
@@ -106,7 +107,6 @@ function flagUnresolvedTies(sorted: GroupStanding[]): void {
     const group = sorted.filter(
       (s) =>
         s.matchesWon === sorted[i].matchesWon &&
-        s.gamesWon === sorted[i].gamesWon &&
         s.setDiff === sorted[i].setDiff &&
         s.gameDiff === sorted[i].gameDiff
     );

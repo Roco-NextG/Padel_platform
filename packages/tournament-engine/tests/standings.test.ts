@@ -31,19 +31,37 @@ describe("calculateStandings — orden de desempate confirmado", () => {
     expect(standings[2].teamId).toBe("C"); // 0 victorias
   });
 
-  it("desempata por juegos ganados cuando hay igualdad de partidos ganados", () => {
+  it("desempata por diferencia de sets cuando hay igualdad de partidos ganados", () => {
     // A y B no se enfrentan entre sí; ambos le ganan a C una sola vez,
-    // con el mismo número de partidos ganados pero distinto total de games.
+    // con el mismo número de partidos ganados pero distinta diferencia de sets.
     const results: MatchResult[] = [
-      { teamAId: "A", teamBId: "C", winnerId: "A", setsWonA: 2, setsWonB: 0, gamesWonA: 12, gamesWonB: 4 },
-      { teamAId: "B", teamBId: "C", winnerId: "B", setsWonA: 2, setsWonB: 0, gamesWonA: 15, gamesWonB: 5 },
+      { teamAId: "A", teamBId: "C", winnerId: "A", setsWonA: 2, setsWonB: 1, gamesWonA: 18, gamesWonB: 16 },
+      { teamAId: "B", teamBId: "C", winnerId: "B", setsWonA: 2, setsWonB: 0, gamesWonA: 12, gamesWonB: 4 },
     ];
     const standings = calculateStandings(["A", "B", "C"], results);
     const a = standings.find((s) => s.teamId === "A")!;
     const b = standings.find((s) => s.teamId === "B")!;
     expect(a.matchesWon).toBe(b.matchesWon); // 1 victoria cada uno
-    expect(b.gamesWon).toBeGreaterThan(a.gamesWon); // B ganó más juegos (15 vs 12)
+    expect(b.setDiff).toBeGreaterThan(a.setDiff); // B ganó 2-0, A ganó 2-1
     expect(standings[0].teamId).toBe("B");
+  });
+
+  it("desempata por diferencia de games (no por total de games jugados) cuando hay igualdad de partidos y sets", () => {
+    // Caso reportado: un equipo con MEJOR diferencia de games pero MENOS
+    // games jugados en total debe quedar por delante de uno con más games
+    // jugados pero peor diferencia — el total de games ya no es criterio.
+    const results: MatchResult[] = [
+      { teamAId: "A", teamBId: "C", winnerId: "A", setsWonA: 2, setsWonB: 0, gamesWonA: 12, gamesWonB: 2 }, // diff +10, 14 games jugados
+      { teamAId: "B", teamBId: "C", winnerId: "B", setsWonA: 2, setsWonB: 0, gamesWonA: 20, gamesWonB: 15 }, // diff +5, 35 games jugados
+    ];
+    const standings = calculateStandings(["A", "B", "C"], results);
+    const a = standings.find((s) => s.teamId === "A")!;
+    const b = standings.find((s) => s.teamId === "B")!;
+    expect(a.matchesWon).toBe(b.matchesWon); // 1 victoria cada uno
+    expect(a.setDiff).toBe(b.setDiff); // ambos 2-0
+    expect(b.gamesWon).toBeGreaterThan(a.gamesWon); // B jugó y ganó más games en total
+    expect(a.gameDiff).toBeGreaterThan(b.gameDiff); // pero A tiene mejor diferencia (+10 vs +5)
+    expect(standings[0].teamId).toBe("A"); // A queda primero por mejor diferencia, no B por más games
   });
 
   it("usa enfrentamiento directo como último criterio, probado de forma aislada sobre el comparador", () => {

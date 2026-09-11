@@ -1,4 +1,5 @@
 import { calculateStandings } from "@padel-platform/tournament-engine";
+import { DEFAULT_SCORING_CONFIG } from "@padel-platform/match-engine";
 import { createClient } from "@/lib/supabase/server";
 import { toMatchResult, type SetRow } from "@/modules/tournaments/infrastructure/bracketRepository";
 import { fetchTeamsForLeagueCategory } from "./leagueEnrollmentRepository";
@@ -67,7 +68,7 @@ export async function fetchLeagueStandings(categoryId: string): Promise<LeagueSt
 
   const { data: matches, error } = await supabase
     .from("matches")
-    .select("league_round_id, team_a_id, team_b_id, winner_team_id, status, set_scores(team_a_games, team_b_games)")
+    .select("league_round_id, team_a_id, team_b_id, winner_team_id, status, set_scores(set_number, team_a_games, team_b_games)")
     .in("league_round_id", roundIds);
   if (error) throw new Error(error.message);
 
@@ -81,7 +82,9 @@ export async function fetchLeagueStandings(categoryId: string): Promise<LeagueSt
     )
     .sort((a, b) => (orderByRoundId.get(a.league_round_id) ?? 0) - (orderByRoundId.get(b.league_round_id) ?? 0));
 
-  const results = confirmedMatches.map((m) => toMatchResult({ ...m, set_scores: m.set_scores as unknown as SetRow[] }));
+  const results = confirmedMatches.map((m) =>
+    toMatchResult({ ...m, set_scores: m.set_scores as unknown as SetRow[] }, DEFAULT_SCORING_CONFIG)
+  );
   const standings = calculateStandings(teamIds, results);
 
   const formByTeam = new Map<string, FormResult[]>();

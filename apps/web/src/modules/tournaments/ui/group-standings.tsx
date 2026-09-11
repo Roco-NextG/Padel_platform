@@ -51,14 +51,9 @@ function GroupRow({
       <span className="w-14 text-right text-[10.5px] tabular-nums text-muted-foreground">
         sets {standing.setDiff >= 0 ? `+${standing.setDiff}` : standing.setDiff}
       </span>
-      <span className="w-10 text-right text-[10.5px] tabular-nums text-muted-foreground">
-        {standing.gameDiff >= 0 ? `+${standing.gameDiff}` : standing.gameDiff}
+      <span className="w-14 text-right text-[10.5px] tabular-nums text-muted-foreground">
+        DG {standing.gameDiff >= 0 ? `+${standing.gameDiff}` : standing.gameDiff}
       </span>
-      {qualifies && (
-        <Badge tone="accent" className="shrink-0">
-          Clasifica
-        </Badge>
-      )}
       {standing.requiresManualResolution && (
         <Badge tone="warning" className="shrink-0">
           Empate
@@ -116,16 +111,23 @@ export function GroupStandings({
 
   const grid = (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      {groups.map((g) => (
-        <div key={g.groupId} className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
-          <h3 className="text-sm font-semibold text-foreground">{g.groupName}</h3>
-          <div className="flex flex-col">
-            {g.standings.map((s, i) => (
-              <GroupRow key={s.teamId} standing={s} position={i + 1} qualifies={i < QUALIFYING_SLOTS_PER_GROUP} draggable={editable} />
-            ))}
+      {groups.map((g) => {
+        // El puesto de un equipo con partidos pendientes es provisorio, no
+        // una clasificación real todavía — el highlight de "quién pasa"
+        // solo tiene sentido una vez que el grupo terminó de jugarse
+        // (todos los partidos del round-robin del grupo, confirmados).
+        const groupFinished = g.standings.every((s) => s.matchesPlayed === g.standings.length - 1);
+        return (
+          <div key={g.groupId} className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+            <h3 className="text-sm font-semibold text-foreground">{g.groupName}</h3>
+            <div className="flex flex-col">
+              {g.standings.map((s, i) => (
+                <GroupRow key={s.teamId} standing={s} position={i + 1} qualifies={groupFinished && i < QUALIFYING_SLOTS_PER_GROUP} draggable={editable} />
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 
@@ -133,6 +135,9 @@ export function GroupStandings({
 
   return (
     <div className="flex flex-col gap-2">
+      <p className="text-[11px] text-muted-foreground">
+        Arrastrá una pareja sobre otra para intercambiarlas de grupo — así podés definir las cabezas de serie de cada grupo.
+      </p>
       {error && <p className="text-[11px] text-destructive">{error}</p>}
       <DndContext onDragEnd={handleDragEnd}>{grid}</DndContext>
     </div>

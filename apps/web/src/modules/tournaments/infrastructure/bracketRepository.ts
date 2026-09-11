@@ -1,3 +1,4 @@
+import type { ScoringConfig } from "@padel-platform/match-engine";
 import {
   balancedSeeding,
   calculateStandings,
@@ -11,6 +12,8 @@ import {
 } from "@padel-platform/tournament-engine";
 import { RATING_CONFIG } from "@padel-platform/rating-engine";
 import { createClient } from "@/lib/supabase/server";
+import { resolveScoringConfig } from "@/modules/matches/domain/match";
+import type { ScoringConfigJson } from "@/lib/supabase/database.types";
 import { fetchTeamsForCategory } from "./enrollmentRepository";
 import {
   phaseTypeForRound,
@@ -21,23 +24,48 @@ import {
 } from "../domain/bracket";
 
 export interface SetRow {
+  set_number: number;
   team_a_games: number;
   team_b_games: number;
 }
 
-/** Exportada para reutilizar en leagueRepository.ts (Liga y Torneo comparten la misma forma de fila de partido → MatchResult, sin duplicar la conversión). */
-export function toMatchResult(m: { team_a_id: string; team_b_id: string; winner_team_id: string; set_scores: SetRow[] }): MatchResult {
+/**
+ * Exportada para reutilizar en leagueRepository.ts (Liga y Torneo comparten
+ * la misma forma de fila de partido → MatchResult, sin duplicar la
+ * conversión). Recibe el scoring_config resuelto del torneo/liga porque el
+ * set decisivo por súper tiebreak guarda 1/0 SIMBÓLICO en team_a_games/
+ * team_b_games (ver match-scoreboard.tsx, no son games reales) — ese set
+ * suma a setsWon/setsLost pero se excluye de gamesWon/gamesLost, a pedido
+ * explícito del usuario ("los games del super tiebreak no se deben contar
+ * en la diferencia de games de la tabla de posiciones").
+ */
+export function toMatchResult(
+  m: { team_a_id: string; team_b_id: string; winner_team_id: string; set_scores: SetRow[] },
+  config: Pick<ScoringConfig, "setsToWin" | "finalSetMode">
+): MatchResult {
+  const decisiveSetNumber = config.finalSetMode === "SUPER_TIEBREAK" ? config.setsToWin * 2 - 1 : null;
   let setsWonA = 0;
   let setsWonB = 0;
   let gamesWonA = 0;
   let gamesWonB = 0;
   for (const s of m.set_scores) {
-    gamesWonA += s.team_a_games;
-    gamesWonB += s.team_b_games;
     if (s.team_a_games > s.team_b_games) setsWonA++;
     else setsWonB++;
+    if (s.set_number === decisiveSetNumber) continue;
+    gamesWonA += s.team_a_games;
+    gamesWonB += s.team_b_games;
   }
   return { teamAId: m.team_a_id, teamBId: m.team_b_id, winnerId: m.winner_team_id, setsWonA, setsWonB, gamesWonA, gamesWonB };
+}
+
+/**
+ * El embed `tournaments(scoring_config)` sobre `matches` no tipa (database.types.ts
+ * mantiene `matches.Relationships` vacío) — mismo cast manual que ya usa este
+ * archivo para `set_scores` (as unknown as SetRow[]).
+ */
+function scoringConfigFromMatchRow(m: { tournaments?: unknown }): Pick<ScoringConfig, "setsToWin" | "finalSetMode"> {
+  const scoringConfig = (m.tournaments as { scoring_config: ScoringConfigJson } | null)?.scoring_config;
+  return resolveScoringConfig(scoringConfig ?? {});
 }
 
 export async function generateGroupStage(tournamentId: string, categoryId: string): Promise<void> {
@@ -107,7 +135,9 @@ export async function fetchGroupStandings(categoryId: string): Promise<GroupStan
     supabase.from("teams").select("id, group_id").eq("tournament_category_id", categoryId).not("group_id", "is", null),
     supabase
       .from("matches")
-      .select("id, group_id, team_a_id, team_b_id, winner_team_id, status, set_scores(team_a_games, team_b_games)")
+      .select(
+        "id, group_id, team_a_id, team_b_id, winner_team_id, status, set_scores(set_number, team_a_games, team_b_games), tournaments(scoring_config)"
+      )
       .eq("phase_id", phase.id),
     fetchTeamsForCategory(categoryId),
   ]);
@@ -122,7 +152,9 @@ export async function fetchGroupStandings(categoryId: string): Promise<GroupStan
       .filter((m): m is typeof m & { team_a_id: string; team_b_id: string; winner_team_id: string } =>
         m.group_id === g.id && m.status === "CONFIRMED" && !!m.team_a_id && !!m.team_b_id && !!m.winner_team_id
       )
-      .map((m) => toMatchResult({ ...m, set_scores: m.set_scores as unknown as SetRow[] }));
+      .map((m) =>
+        toMatchResult({ ...m, set_scores: m.set_scores as unknown as SetRow[] }, scoringConfigFromMatchRow(m))
+      );
     const standings = calculateStandings(teamIds, results).map((s) => ({
       ...s,
       teamLabel: teamLabelById.get(s.teamId) ?? "?",
@@ -153,7 +185,9 @@ async function fetchQualifiedStandingsByGroup(
     supabase.from("teams").select("id, group_id").eq("tournament_category_id", categoryId).not("group_id", "is", null),
     supabase
       .from("matches")
-      .select("id, group_id, team_a_id, team_b_id, winner_team_id, status, set_scores(team_a_games, team_b_games)")
+      .select(
+        "id, group_id, team_a_id, team_b_id, winner_team_id, status, set_scores(set_number, team_a_games, team_b_games), tournaments(scoring_config)"
+      )
       .eq("phase_id", groupsPhaseId),
   ]);
 
@@ -167,7 +201,9 @@ async function fetchQualifiedStandingsByGroup(
       .filter((m): m is typeof m & { team_a_id: string; team_b_id: string; winner_team_id: string } =>
         m.group_id === g.id && m.status === "CONFIRMED" && !!m.team_a_id && !!m.team_b_id && !!m.winner_team_id
       )
-      .map((m) => toMatchResult({ ...m, set_scores: m.set_scores as unknown as SetRow[] }));
+      .map((m) =>
+        toMatchResult({ ...m, set_scores: m.set_scores as unknown as SetRow[] }, scoringConfigFromMatchRow(m))
+      );
     // Solo los clasificados (04_TOURNAMENT_ENGINE.md §4.1) entran a la
     // lista global de fortaleza — antes se pasaba el grupo entero, y todo
     // equipo eliminado en grupos terminaba igual sembrado en el cuadro.
