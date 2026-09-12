@@ -1,17 +1,16 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
+import { CaretDown, UsersThree } from "@phosphor-icons/react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input, Select } from "@/components/ui/input";
+import { Field, Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
-import { UsersThree, X } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
-import type { AccountDetailField, PlatformAccount } from "../infrastructure/usersRepository";
+import type { AccountDetail, PlatformAccount } from "../infrastructure/usersRepository";
 import type { PlanRow } from "../infrastructure/billingRepository";
 import {
   changePlanAction,
@@ -19,6 +18,7 @@ import {
   fetchAccountDetailAction,
   makeAdminAction,
   setAccountActiveAction,
+  updateAccountDetailAction,
 } from "../application/usersActions";
 
 const ACCOUNT_TYPE_LABEL: Record<PlatformAccount["accountType"], string> = {
@@ -26,94 +26,6 @@ const ACCOUNT_TYPE_LABEL: Record<PlatformAccount["accountType"], string> = {
   CLUB: "Club",
   ORGANIZADOR: "Organizador",
 };
-
-/**
- * Detalle de una cuenta — exactamente los datos que el admin cargó al
- * crearla (pedido explícito), no historial de negocio. En un portal a
- * document.body: AccountRow vive dentro de una lista con su propio
- * stacking context (Card + scroll), mismo criterio ya usado para el modal
- * de "Tabla general" del Cuadro.
- */
-function AccountDetailModal({
-  account,
-  open,
-  fields,
-  loading,
-  error,
-  onClose,
-}: {
-  account: PlatformAccount;
-  open: boolean;
-  fields: AccountDetailField[] | null;
-  loading: boolean;
-  error: string | null;
-  onClose: () => void;
-}) {
-  if (typeof document === "undefined") return null;
-
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 12, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 380, damping: 32 }}
-            onClick={(e) => e.stopPropagation()}
-            className="flex w-full max-w-md flex-col gap-4 rounded-2xl border border-border bg-surface p-6 shadow-lg"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <Avatar name={account.displayName} />
-                <div className="min-w-0">
-                  <h3 className="truncate text-base font-semibold text-foreground">{account.displayName}</h3>
-                  <p className="text-xs text-muted-foreground">{ACCOUNT_TYPE_LABEL[account.accountType]}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Cerrar"
-                className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-surface-secondary hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            {loading && <p className="text-sm text-muted-foreground">Cargando...</p>}
-            {error && (
-              <span className="text-xs text-destructive" role="alert">
-                {error}
-              </span>
-            )}
-            {fields && (
-              <dl className="flex flex-col gap-2.5">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <dt className="text-muted-foreground">Email de la cuenta</dt>
-                  <dd className="truncate font-medium text-foreground">{account.email ?? "—"}</dd>
-                </div>
-                {fields.map((f) => (
-                  <div key={f.label} className="flex items-center justify-between gap-3 text-sm">
-                    <dt className="shrink-0 text-muted-foreground">{f.label}</dt>
-                    <dd className="truncate font-medium text-foreground">{f.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body
-  );
-}
 
 type FilterValue = "TODOS" | "ACTIVOS" | "JUGADOR" | "CLUB" | "ORGANIZADOR" | "INACTIVOS";
 
@@ -131,33 +43,134 @@ function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString("es-VE", { year: "numeric", month: "short", day: "numeric" });
 }
 
+/**
+ * Datos que el admin cargó al crear la cuenta, editables acá por si hubo un
+ * error al cargarlos — pedido explícito: desplegable en el lugar, no modal.
+ * Se pide bajo demanda (lazy) al abrir por primera vez, y cada campo se
+ * guarda solo al perder foco (mismo criterio ya usado en CourtsManager /
+ * OrganizerClubEditor).
+ */
+function AccountDetailFields({
+  account,
+  detail,
+  onChange,
+  onBlurSave,
+}: {
+  account: PlatformAccount;
+  detail: AccountDetail;
+  onChange: (patch: Partial<AccountDetail>) => void;
+  onBlurSave: () => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-3 border-t border-border pt-3 sm:grid-cols-2">
+      <Field id={`acc-email-${account.entityId}`} label="Email de la cuenta">
+        <Input id={`acc-email-${account.entityId}`} value={account.email ?? "—"} disabled />
+      </Field>
+      {account.accountType === "CLUB" && (
+        <>
+          <Field id={`acc-clubname-${account.entityId}`} label="Nombre del club">
+            <Input
+              id={`acc-clubname-${account.entityId}`}
+              value={detail.clubName ?? ""}
+              onChange={(e) => onChange({ clubName: e.target.value })}
+              onBlur={onBlurSave}
+            />
+          </Field>
+          <Field id={`acc-city-${account.entityId}`} label="Ciudad" optional>
+            <Input
+              id={`acc-city-${account.entityId}`}
+              value={detail.city ?? ""}
+              onChange={(e) => onChange({ city: e.target.value })}
+              onBlur={onBlurSave}
+            />
+          </Field>
+        </>
+      )}
+      <Field id={`acc-first-${account.entityId}`} label={account.accountType === "CLUB" ? "Nombre de contacto" : "Nombre"}>
+        <Input
+          id={`acc-first-${account.entityId}`}
+          value={detail.firstName ?? ""}
+          onChange={(e) => onChange({ firstName: e.target.value })}
+          onBlur={onBlurSave}
+        />
+      </Field>
+      <Field id={`acc-last-${account.entityId}`} label={account.accountType === "CLUB" ? "Apellido de contacto" : "Apellido"}>
+        <Input
+          id={`acc-last-${account.entityId}`}
+          value={detail.lastName ?? ""}
+          onChange={(e) => onChange({ lastName: e.target.value })}
+          onBlur={onBlurSave}
+        />
+      </Field>
+      <Field id={`acc-phone-${account.entityId}`} label="Teléfono" optional>
+        <Input
+          id={`acc-phone-${account.entityId}`}
+          value={detail.phone ?? ""}
+          onChange={(e) => onChange({ phone: e.target.value })}
+          onBlur={onBlurSave}
+        />
+      </Field>
+      {account.accountType === "CLUB" && (
+        <Field id={`acc-contactemail-${account.entityId}`} label="Email de contacto del club" optional>
+          <Input
+            id={`acc-contactemail-${account.entityId}`}
+            value={detail.contactEmail ?? ""}
+            onChange={(e) => onChange({ contactEmail: e.target.value })}
+            onBlur={onBlurSave}
+          />
+        </Field>
+      )}
+    </div>
+  );
+}
+
 function AccountRow({
   account,
   plans,
   showManagement,
+  onUpdate,
 }: {
   account: PlatformAccount;
   plans: PlanRow[];
   showManagement: boolean;
+  onUpdate: (patch: Partial<PlatformAccount>) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const canHavePlan = account.accountType === "CLUB" || account.accountType === "ORGANIZADOR";
 
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detailFields, setDetailFields] = useState<AccountDetailField[] | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [detail, setDetail] = useState<AccountDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [savePending, startSaveTransition] = useTransition();
 
-  function handleViewDetail() {
-    setDetailOpen(true);
-    if (detailFields || detailLoading) return;
+  function handleToggleExpand() {
+    setExpanded((v) => !v);
+    if (detail || detailLoading) return;
     setDetailLoading(true);
     setDetailError(null);
     fetchAccountDetailAction(account.accountType, account.entityId).then((result) => {
       setDetailLoading(false);
       if (result.error) setDetailError(result.error);
-      else setDetailFields(result.fields);
+      else setDetail(result.detail);
+    });
+  }
+
+  function handleDetailChange(patch: Partial<AccountDetail>) {
+    setDetail((prev) => (prev ? { ...prev, ...patch } : prev));
+  }
+
+  function handleDetailSave() {
+    if (!detail) return;
+    setDetailError(null);
+    startSaveTransition(async () => {
+      const result = await updateAccountDetailAction(account.accountType, account.entityId, detail);
+      if (result.error) {
+        setDetailError(result.error);
+        return;
+      }
+      if (result.displayName) onUpdate({ displayName: result.displayName });
     });
   }
 
@@ -201,9 +214,10 @@ function AccountRow({
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
-          onClick={handleViewDetail}
+          onClick={handleToggleExpand}
           className="group flex min-w-0 items-center gap-3 rounded-md text-left"
-          aria-label={`Ver detalle de ${account.displayName}`}
+          aria-expanded={expanded}
+          aria-label={expanded ? `Ocultar datos de ${account.displayName}` : `Ver y editar datos de ${account.displayName}`}
         >
           <Avatar name={account.displayName} />
           <div className="flex min-w-0 flex-col gap-0.5">
@@ -215,6 +229,7 @@ function AccountRow({
             </div>
             {account.email && <span className="truncate text-xs text-muted-foreground">{account.email}</span>}
           </div>
+          <CaretDown className={cn("size-3.5 shrink-0 text-foreground-tertiary transition-transform", expanded && "rotate-180")} weight="bold" />
         </button>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -267,20 +282,34 @@ function AccountRow({
         </span>
       )}
 
-      <AccountDetailModal
-        account={account}
-        open={detailOpen}
-        fields={detailFields}
-        loading={detailLoading}
-        error={detailError}
-        onClose={() => setDetailOpen(false)}
-      />
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="overflow-hidden"
+          >
+            {detailLoading && <p className="border-t border-border pt-3 text-sm text-muted-foreground">Cargando...</p>}
+            {detailError && (
+              <span className="block border-t border-border pt-3 text-xs text-destructive" role="alert">
+                {detailError}
+              </span>
+            )}
+            {detail && (
+              <AccountDetailFields account={account} detail={detail} onChange={handleDetailChange} onBlurSave={handleDetailSave} />
+            )}
+            {savePending && <p className="mt-1 text-[11px] text-muted-foreground">Guardando...</p>}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Card>
   );
 }
 
 export function PlatformAccountList({
-  accounts,
+  accounts: initialAccounts,
   plans,
   showManagement = false,
 }: {
@@ -288,8 +317,13 @@ export function PlatformAccountList({
   plans: PlanRow[];
   showManagement?: boolean;
 }) {
+  const [accounts, setAccounts] = useState(initialAccounts);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterValue>("TODOS");
+
+  function handleAccountUpdate(entityId: string, patch: Partial<PlatformAccount>) {
+    setAccounts((prev) => prev.map((a) => (a.entityId === entityId ? { ...a, ...patch } : a)));
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -335,7 +369,13 @@ export function PlatformAccountList({
       ) : (
         <div className="flex flex-col gap-2">
           {filtered.map((a) => (
-            <AccountRow key={`${a.accountType}-${a.entityId}`} account={a} plans={plans} showManagement={showManagement} />
+            <AccountRow
+              key={`${a.accountType}-${a.entityId}`}
+              account={a}
+              plans={plans}
+              showManagement={showManagement}
+              onUpdate={(patch) => handleAccountUpdate(a.entityId, patch)}
+            />
           ))}
         </div>
       )}

@@ -11,7 +11,8 @@ import {
   makeAdmin,
   revokeAdmin,
   setAccountActive,
-  type AccountDetailField,
+  updateAccountDetail,
+  type AccountDetail,
   type PlatformAccountType,
 } from "../infrastructure/usersRepository";
 import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
@@ -149,18 +150,40 @@ export async function setAccountActiveAction(
 
 export interface AccountDetailState {
   error: string | null;
-  fields: AccountDetailField[] | null;
+  detail: AccountDetail | null;
 }
 
 export async function fetchAccountDetailAction(accountType: PlatformAccountType, entityId: string): Promise<AccountDetailState> {
   const auth = await requireAdmin();
-  if ("error" in auth) return { error: auth.error, fields: null };
+  if ("error" in auth) return { error: auth.error, detail: null };
 
   try {
-    const fields = await fetchAccountDetail(accountType, entityId);
-    return { error: null, fields };
+    const detail = await fetchAccountDetail(accountType, entityId);
+    return { error: null, detail };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "No se pudo cargar el detalle.", fields: null };
+    return { error: e instanceof Error ? e.message : "No se pudo cargar el detalle.", detail: null };
+  }
+}
+
+export interface UpdateAccountDetailState {
+  error: string | null;
+  displayName: string | null;
+}
+
+export async function updateAccountDetailAction(
+  accountType: PlatformAccountType,
+  entityId: string,
+  detail: AccountDetail
+): Promise<UpdateAccountDetailState> {
+  const auth = await requireAdmin();
+  if ("error" in auth) return { error: auth.error, displayName: null };
+
+  try {
+    const displayName = await updateAccountDetail(accountType, entityId, detail);
+    revalidatePath("/admin/usuarios");
+    return { error: null, displayName };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo guardar.", displayName: null };
   }
 }
 

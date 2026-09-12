@@ -135,18 +135,23 @@ export async function fetchAllPlatformUsers(): Promise<PlatformAccount[]> {
   );
 }
 
-export interface AccountDetailField {
-  label: string;
-  value: string;
-}
-
 /**
  * Exactamente los datos que el admin cargó al crear la cuenta (create-user-form.tsx
- * / createAccountWithInvite) — no historial de negocio (torneos, reservas, pagos),
- * eso es otro pedido. Cada tipo de cuenta guarda esos datos en una tabla distinta
- * (clubs/organizers/players), así que el shape de columnas a pedir difiere por rol.
+ * / createAccountWithInvite), editables desde acá si hubo un error al cargarlos —
+ * no historial de negocio (torneos, reservas, pagos), eso es otro pedido. clubName/
+ * city/contactEmail solo aplican a CLUB; firstName/lastName/phone aplican a los 3
+ * tipos (para Club son los datos de la persona de contacto, no del club en sí).
  */
-export async function fetchAccountDetail(accountType: PlatformAccountType, entityId: string): Promise<AccountDetailField[]> {
+export interface AccountDetail {
+  clubName: string | null;
+  city: string | null;
+  contactEmail: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+}
+
+export async function fetchAccountDetail(accountType: PlatformAccountType, entityId: string): Promise<AccountDetail> {
   const supabase = await createClient();
 
   if (accountType === "CLUB") {
@@ -156,13 +161,14 @@ export async function fetchAccountDetail(accountType: PlatformAccountType, entit
       .eq("id", entityId)
       .single();
     if (error) throw new Error(error.message);
-    return [
-      { label: "Nombre del club", value: data.name },
-      { label: "Ciudad", value: data.city ?? "—" },
-      { label: "Persona de contacto", value: [data.contact_first_name, data.contact_last_name].filter(Boolean).join(" ") || "—" },
-      { label: "Teléfono", value: data.contact_phone ?? "—" },
-      { label: "Email de contacto del club", value: data.contact_email ?? "—" },
-    ];
+    return {
+      clubName: data.name,
+      city: data.city,
+      contactEmail: data.contact_email,
+      firstName: data.contact_first_name,
+      lastName: data.contact_last_name,
+      phone: data.contact_phone,
+    };
   }
 
   if (accountType === "ORGANIZADOR") {
@@ -172,20 +178,60 @@ export async function fetchAccountDetail(accountType: PlatformAccountType, entit
       .eq("id", entityId)
       .single();
     if (error) throw new Error(error.message);
-    return [
-      { label: "Nombre", value: data.contact_first_name ?? "—" },
-      { label: "Apellido", value: data.contact_last_name ?? "—" },
-      { label: "Teléfono", value: data.contact_phone ?? "—" },
-    ];
+    return { clubName: null, city: null, contactEmail: null, firstName: data.contact_first_name, lastName: data.contact_last_name, phone: data.contact_phone };
   }
 
   const { data, error } = await supabase.from("players").select("first_name, last_name, phone").eq("id", entityId).single();
   if (error) throw new Error(error.message);
-  return [
-    { label: "Nombre", value: data.first_name },
-    { label: "Apellido", value: data.last_name },
-    { label: "Teléfono", value: data.phone ?? "—" },
-  ];
+  return { clubName: null, city: null, contactEmail: null, firstName: data.first_name, lastName: data.last_name, phone: data.phone };
+}
+
+/** displayName resultante tras guardar — para que la lista (client-side) refleje el cambio sin esperar un reload. */
+export async function updateAccountDetail(accountType: PlatformAccountType, entityId: string, detail: AccountDetail): Promise<string> {
+  const supabase = await createClient();
+
+  if (accountType === "CLUB") {
+    const name = (detail.clubName ?? "").trim();
+    if (!name) throw new Error("El nombre del club es obligatorio.");
+    const { error } = await supabase
+      .from("clubs")
+      .update({
+        name,
+        city: detail.city?.trim() || null,
+        contact_email: detail.contactEmail?.trim() || null,
+        contact_first_name: detail.firstName?.trim() || null,
+        contact_last_name: detail.lastName?.trim() || null,
+        contact_phone: detail.phone?.trim() || null,
+      })
+      .eq("id", entityId);
+    if (error) throw new Error(error.message);
+    return name;
+  }
+
+  const firstName = (detail.firstName ?? "").trim();
+  const lastName = (detail.lastName ?? "").trim();
+  if (!firstName || !lastName) throw new Error("Nombre y apellido son obligatorios.");
+
+  if (accountType === "ORGANIZADOR") {
+    const { error } = await supabase
+      .from("organizers")
+      .update({
+        name: `${firstName} ${lastName}`.trim(),
+        contact_first_name: firstName,
+        contact_last_name: lastName,
+        contact_phone: detail.phone?.trim() || null,
+      })
+      .eq("id", entityId);
+    if (error) throw new Error(error.message);
+    return `${firstName} ${lastName}`.trim();
+  }
+
+  const { error } = await supabase
+    .from("players")
+    .update({ first_name: firstName, last_name: lastName, phone: detail.phone?.trim() || null })
+    .eq("id", entityId);
+  if (error) throw new Error(error.message);
+  return `${firstName} ${lastName}`.trim();
 }
 
 export interface PlayerEngagement {
