@@ -7,9 +7,11 @@ import {
   changeAccountPlan,
   createAccountWithInvite,
   deleteAccount,
+  fetchAccountDetail,
   makeAdmin,
   revokeAdmin,
   setAccountActive,
+  type AccountDetailField,
   type PlatformAccountType,
 } from "../infrastructure/usersRepository";
 import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
@@ -143,6 +145,23 @@ export async function setAccountActiveAction(
   revalidatePath("/admin");
   revalidatePath("/admin/usuarios");
   return { error: null };
+}
+
+export interface AccountDetailState {
+  error: string | null;
+  fields: AccountDetailField[] | null;
+}
+
+export async function fetchAccountDetailAction(accountType: PlatformAccountType, entityId: string): Promise<AccountDetailState> {
+  const auth = await requireAdmin();
+  if ("error" in auth) return { error: auth.error, fields: null };
+
+  try {
+    const fields = await fetchAccountDetail(accountType, entityId);
+    return { error: null, fields };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo cargar el detalle.", fields: null };
+  }
 }
 
 export async function changePlanAction(

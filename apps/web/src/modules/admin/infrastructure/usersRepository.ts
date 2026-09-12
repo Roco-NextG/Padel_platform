@@ -135,6 +135,59 @@ export async function fetchAllPlatformUsers(): Promise<PlatformAccount[]> {
   );
 }
 
+export interface AccountDetailField {
+  label: string;
+  value: string;
+}
+
+/**
+ * Exactamente los datos que el admin cargó al crear la cuenta (create-user-form.tsx
+ * / createAccountWithInvite) — no historial de negocio (torneos, reservas, pagos),
+ * eso es otro pedido. Cada tipo de cuenta guarda esos datos en una tabla distinta
+ * (clubs/organizers/players), así que el shape de columnas a pedir difiere por rol.
+ */
+export async function fetchAccountDetail(accountType: PlatformAccountType, entityId: string): Promise<AccountDetailField[]> {
+  const supabase = await createClient();
+
+  if (accountType === "CLUB") {
+    const { data, error } = await supabase
+      .from("clubs")
+      .select("name, city, contact_email, contact_first_name, contact_last_name, contact_phone")
+      .eq("id", entityId)
+      .single();
+    if (error) throw new Error(error.message);
+    return [
+      { label: "Nombre del club", value: data.name },
+      { label: "Ciudad", value: data.city ?? "—" },
+      { label: "Persona de contacto", value: [data.contact_first_name, data.contact_last_name].filter(Boolean).join(" ") || "—" },
+      { label: "Teléfono", value: data.contact_phone ?? "—" },
+      { label: "Email de contacto del club", value: data.contact_email ?? "—" },
+    ];
+  }
+
+  if (accountType === "ORGANIZADOR") {
+    const { data, error } = await supabase
+      .from("organizers")
+      .select("contact_first_name, contact_last_name, contact_phone")
+      .eq("id", entityId)
+      .single();
+    if (error) throw new Error(error.message);
+    return [
+      { label: "Nombre", value: data.contact_first_name ?? "—" },
+      { label: "Apellido", value: data.contact_last_name ?? "—" },
+      { label: "Teléfono", value: data.contact_phone ?? "—" },
+    ];
+  }
+
+  const { data, error } = await supabase.from("players").select("first_name, last_name, phone").eq("id", entityId).single();
+  if (error) throw new Error(error.message);
+  return [
+    { label: "Nombre", value: data.first_name },
+    { label: "Apellido", value: data.last_name },
+    { label: "Teléfono", value: data.phone ?? "—" },
+  ];
+}
+
 export interface PlayerEngagement {
   totalPlayers: number;
   activePlayersLast30d: number;
