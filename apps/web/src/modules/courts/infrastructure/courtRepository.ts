@@ -15,9 +15,12 @@ export interface ClubHostOption {
 
 /**
  * Para el picker de sede del wizard de Crear Torneo (Organizador eligiendo
- * dónde alojar su torneo) — courts_select ya es visible para cualquier
- * Club/Organizador vía is_tournament_staff() (0007_courts_and_audit_log.sql),
- * así que esto es una lectura directa, sin RPC.
+ * dónde alojar su torneo). courts_select ya es visible para cualquier
+ * Club/Organizador vía is_tournament_staff() (0007_courts_and_audit_log.sql).
+ * clubs_select NO lo era — solo dejaba ver el club propio de una cuenta
+ * CLUB (is_club(id)), así que esta lectura devolvía 0 clubes para cualquier
+ * Organizador real (bug corregido en 0031_organizer_creates_club.sql,
+ * ampliado a is_tournament_staff() + is_active).
  */
 export async function fetchClubHostOptions(): Promise<ClubHostOption[]> {
   const supabase = await createClient();
@@ -39,6 +42,25 @@ export async function fetchClubHostOptions(): Promise<ClubHostOption[]> {
     const names = courtsByClub.get(c.id) ?? [];
     return { clubId: c.id, clubName: c.name, courtCount: names.length, courtNames: names };
   });
+}
+
+/**
+ * Un Organizador nunca es dueño de un club (courts_write sigue exigiendo
+ * is_club(club_id) — eso no cambia), así que esto no es un insert directo:
+ * pasa por una RPC security definer que valida el rol adentro y crea el
+ * club + sus pistas de una sola vez, para destrabar el wizard de Crear
+ * Torneo cuando el Organizador todavía no tiene ningún club para elegir.
+ */
+export async function createClubAsOrganizer(name: string, city: string | null, courtCount: number): Promise<ClubHostOption> {
+  const supabase = await createClient();
+  const { data: clubId, error } = await supabase.rpc("create_club_as_organizer", {
+    p_name: name,
+    p_city: city,
+    p_court_count: courtCount,
+  });
+  if (error) throw new Error(error.message);
+  const courtNames = Array.from({ length: courtCount }, (_, i) => `Pista ${i + 1}`);
+  return { clubId, clubName: name.trim(), courtCount, courtNames };
 }
 
 export async function fetchClubCourts(clubId: string): Promise<Court[]> {

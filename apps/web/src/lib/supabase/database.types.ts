@@ -77,6 +77,7 @@ export interface Database {
           time_zone: string;
           address: string | null;
           is_active: boolean;
+          created_by_organizer_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -91,6 +92,7 @@ export interface Database {
           time_zone?: string;
           address?: string | null;
           is_active?: boolean;
+          created_by_organizer_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["clubs"]["Insert"]>;
       };
@@ -741,6 +743,10 @@ export interface Database {
           category: number | null;
           gender: GenderType | null;
         }[];
+      };
+      create_club_as_organizer: {
+        Args: { p_name: string; p_city: string | null; p_court_count: number };
+        Returns: string;
       };
     };
     Enums: {
