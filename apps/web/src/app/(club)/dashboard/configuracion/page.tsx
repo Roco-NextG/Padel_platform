@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
 import { fetchClubSurfaceAccount } from "@/modules/shell/infrastructure/accountRepository";
-import { fetchClubCourts } from "@/modules/courts/infrastructure/courtRepository";
+import { fetchClubCourts, fetchClubsCreatedByOrganizer } from "@/modules/courts/infrastructure/courtRepository";
 import { CourtsManager } from "@/modules/courts/ui/courts-manager";
+import { OrganizerClubEditor } from "@/modules/courts/ui/organizer-club-editor";
 import { ProfileForm } from "@/modules/shell/ui/profile-form";
 import { Card } from "@/components/ui/card";
 
@@ -57,6 +58,33 @@ export default async function ConfiguracionPage() {
           <CourtsManager clubId={account.clubId} courts={await fetchClubCourts(account.clubId)} />
         </div>
       )}
+
+      {account.role === "Organizador" && account.organizerId && (
+        <OrganizerCreatedClubsSection organizerId={account.organizerId} />
+      )}
+    </div>
+  );
+}
+
+async function OrganizerCreatedClubsSection({ organizerId }: { organizerId: string }) {
+  const clubs = await fetchClubsCreatedByOrganizer(organizerId);
+  if (clubs.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <h2 className="text-sm font-medium text-foreground">Clubes que creaste</h2>
+        <p className="text-xs text-muted-foreground">
+          Clubes que agregaste vos mismo al elegir dónde jugar un torneo — corregí sus datos o sus pistas si hiciera falta.
+        </p>
+      </div>
+      <div className="flex flex-col gap-3">
+        {await Promise.all(
+          clubs.map(async (club) => (
+            <OrganizerClubEditor key={club.clubId} club={club} courts={await fetchClubCourts(club.clubId)} />
+          ))
+        )}
+      </div>
     </div>
   );
 }

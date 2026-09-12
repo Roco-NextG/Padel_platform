@@ -45,11 +45,14 @@ export async function fetchClubHostOptions(): Promise<ClubHostOption[]> {
 }
 
 /**
- * Un Organizador nunca es dueño de un club (courts_write sigue exigiendo
- * is_club(club_id) — eso no cambia), así que esto no es un insert directo:
- * pasa por una RPC security definer que valida el rol adentro y crea el
- * club + sus pistas de una sola vez, para destrabar el wizard de Crear
- * Torneo cuando el Organizador todavía no tiene ningún club para elegir.
+ * Un Organizador nunca es dueño de un club vía is_club() (esa función solo
+ * resuelve para la cuenta CLUB de siempre), así que la CREACIÓN no es un
+ * insert directo: pasa por una RPC security definer que valida el rol
+ * adentro y crea el club + sus pistas de una sola vez, para destrabar el
+ * wizard de Crear Torneo cuando el Organizador todavía no tiene ningún club
+ * para elegir. La EDICIÓN posterior (nombre/ciudad/pistas) de un club así
+ * creado sí es un update/insert directo — is_organizer_created_club()
+ * (0032_organizer_edits_own_club.sql) lo permite en RLS igual que is_club().
  */
 export async function createClubAsOrganizer(name: string, city: string | null, courtCount: number): Promise<ClubHostOption> {
   const supabase = await createClient();
@@ -61,6 +64,38 @@ export async function createClubAsOrganizer(name: string, city: string | null, c
   if (error) throw new Error(error.message);
   const courtNames = Array.from({ length: courtCount }, (_, i) => `Pista ${i + 1}`);
   return { clubId, clubName: name.trim(), courtCount, courtNames };
+}
+
+export interface OrganizerCreatedClub {
+  clubId: string;
+  clubName: string;
+  city: string | null;
+}
+
+/** Clubes que este Organizador creó desde el wizard de Crear Torneo (0031) — para poder editarlos si se equivocó al cargarlos. */
+export async function fetchClubsCreatedByOrganizer(organizerId: string): Promise<OrganizerCreatedClub[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("clubs")
+    .select("id, name, city")
+    .eq("created_by_organizer_id", organizerId)
+    .order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((c) => ({ clubId: c.id, clubName: c.name, city: c.city }));
+}
+
+/** Ownership real de un club (created_by_organizer_id) — usado por el guard de las Server Actions de pistas/datos de club para saber si el Organizador que las llama puede administrar ESTE club puntual. */
+export async function fetchClubOwnership(clubId: string): Promise<{ createdByOrganizerId: string | null } | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("clubs").select("created_by_organizer_id").eq("id", clubId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? { createdByOrganizerId: data.created_by_organizer_id } : null;
+}
+
+export async function updateClubBasicInfo(clubId: string, name: string, city: string | null): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("clubs").update({ name, city }).eq("id", clubId);
+  if (error) throw new Error(error.message);
 }
 
 export async function fetchClubCourts(clubId: string): Promise<Court[]> {

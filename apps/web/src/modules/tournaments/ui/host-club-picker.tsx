@@ -74,9 +74,7 @@ export function HostClubPicker({ options: initialOptions }: { options: ClubHostO
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <MapPin className="size-3.5" />
-                  {club.courtCount === 0
-                    ? "Sin pistas cargadas"
-                    : `${club.courtCount} ${club.courtCount === 1 ? "pista" : "pistas"} · ${club.courtNames.join(", ")}`}
+                  {club.courtCount === 0 ? "Sin pistas cargadas" : `${club.courtCount} ${club.courtCount === 1 ? "pista" : "pistas"}`}
                 </div>
               </motion.button>
             );

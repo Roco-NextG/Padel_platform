@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { courtNameSchema } from "../domain/court";
-import { fetchClubCourts, insertCourt, setCourtStatus, updateCourtName } from "../infrastructure/courtRepository";
+import { fetchClubCourts, fetchClubOwnership, insertCourt, setCourtStatus, updateClubBasicInfo, updateCourtName } from "../infrastructure/courtRepository";
 import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
 import { isClub } from "@/modules/auth/domain/roles";
 
@@ -10,15 +10,42 @@ export interface SimpleActionState {
   error: string | null;
 }
 
-async function requireOwnClub(clubId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+/**
+ * Administra este club una cuenta CLUB dueña de él (de siempre), o el
+ * Organizador que lo creó desde el wizard de Crear Torneo (0031) — nunca
+ * tuvo cuenta CLUB propia, así que sin este segundo camino quedaría
+ * imposible de corregir para cualquiera hasta que un admin lo reclame.
+ */
+async function requireClubManager(clubId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const context = await getCurrentUserContext();
   if (!context) return { ok: false, error: "Tu sesión expiró. Vuelve a iniciar sesión." };
-  if (!isClub(context.roles, clubId)) return { ok: false, error: "No administras este club." };
-  return { ok: true };
+  if (isClub(context.roles, clubId)) return { ok: true };
+
+  const organizerRole = context.roles.find((r) => r.role === "ORGANIZADOR");
+  if (organizerRole?.organizerId) {
+    const ownership = await fetchClubOwnership(clubId);
+    if (ownership?.createdByOrganizerId === organizerRole.organizerId) return { ok: true };
+  }
+  return { ok: false, error: "No administras este club." };
+}
+
+export async function updateOrganizerClubAction(clubId: string, name: string, city: string): Promise<SimpleActionState> {
+  const auth = await requireClubManager(clubId);
+  if (!auth.ok) return { error: auth.error };
+  if (!name.trim()) return { error: "El nombre del club es obligatorio." };
+
+  try {
+    await updateClubBasicInfo(clubId, name.trim(), city.trim() || null);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo actualizar el club." };
+  }
+
+  revalidatePath("/dashboard/configuracion");
+  return { error: null };
 }
 
 export async function addCourtAction(clubId: string): Promise<SimpleActionState> {
-  const auth = await requireOwnClub(clubId);
+  const auth = await requireClubManager(clubId);
   if (!auth.ok) return { error: auth.error };
 
   try {
@@ -33,7 +60,7 @@ export async function addCourtAction(clubId: string): Promise<SimpleActionState>
 }
 
 export async function renameCourtAction(clubId: string, courtId: string, name: string): Promise<SimpleActionState> {
-  const auth = await requireOwnClub(clubId);
+  const auth = await requireClubManager(clubId);
   if (!auth.ok) return { error: auth.error };
 
   const parsed = courtNameSchema.safeParse({ name });
@@ -50,7 +77,7 @@ export async function renameCourtAction(clubId: string, courtId: string, name: s
 }
 
 export async function toggleCourtStatusAction(clubId: string, courtId: string, disable: boolean): Promise<SimpleActionState> {
-  const auth = await requireOwnClub(clubId);
+  const auth = await requireClubManager(clubId);
   if (!auth.ok) return { error: auth.error };
 
   try {
