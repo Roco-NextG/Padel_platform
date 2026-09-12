@@ -71,10 +71,20 @@ export async function fetchAllPlatformUsers(): Promise<PlatformAccount[]> {
   );
   const admin = createAdminClient();
   const emailByUserId = new Map<string, string | null>();
+  // Un solo fallo de red/rate-limit contra la Admin API de Supabase (visto en
+  // vivo en producción: "Minified React error #441", digest sin más detalle,
+  // intermitente) tiraba abajo TODA la lista — Promise.all rechaza entero si
+  // una sola de estas llamadas en paralelo revienta. Cada lookup ahora es
+  // best-effort: si falla, ese usuario queda con email null en vez de romper
+  // la página completa.
   await Promise.all(
     knownUserIds.map(async (userId) => {
-      const { data } = await admin.auth.admin.getUserById(userId);
-      emailByUserId.set(userId, data.user?.email ?? null);
+      try {
+        const { data } = await admin.auth.admin.getUserById(userId);
+        emailByUserId.set(userId, data.user?.email ?? null);
+      } catch {
+        emailByUserId.set(userId, null);
+      }
     })
   );
 
