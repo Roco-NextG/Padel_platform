@@ -19,12 +19,12 @@ function StickerWatermark({ compact, centered }: { compact?: boolean; centered?:
   return (
     <span
       className={cn(
-        "font-medium uppercase tracking-widest text-white/45",
+        "font-medium tracking-widest text-white/45",
         centered ? "self-center" : "self-end",
         compact ? "text-[10px]" : "text-[11px]"
       )}
     >
-      Padel Platform
+      PADEL PLATFORM
     </span>
   );
 }
@@ -75,12 +75,12 @@ export function ResultSticker({
     return (
       <div className="flex w-full flex-col items-center gap-3 overflow-hidden rounded-3xl bg-black/85 p-8 text-center">
         <span
-          className="rounded-full px-5 py-1.5 text-[22px] font-semibold uppercase tracking-wide text-black"
+          className="rounded-full px-5 py-1.5 text-[22px] font-semibold tracking-wide text-black"
           style={{ backgroundColor: ACCENT_GREEN }}
         >
-          Ganador
+          GANADOR
         </span>
-        <span className="max-w-full truncate text-[44px] font-bold leading-tight">{winnerLabel}</span>
+        <span className="max-w-full truncate text-[44px] font-bold leading-normal">{winnerLabel}</span>
         <span className="text-[24px] font-medium opacity-80">{scoreLine}</span>
         <StickerWatermark />
       </div>
@@ -122,15 +122,28 @@ const ACCENT_GREEN = "#c8ef5a";
  * un sticker de referencia) — el ganador se resalta en verde con cada set
  * dentro de un círculo relleno; el perdedor queda en blanco liso, sin
  * círculo, para que la jerarquía visual sea obvia de un vistazo.
+ *
+ * El nombre va en mayúsculas vía .toUpperCase() del string (no con la clase
+ * `uppercase` de Tailwind, aunque eso resultó no ser la causa del recorte —
+ * se mantiene igual porque es más explícito para el lector).
+ *
+ * `truncate` (para que un nombre largo se abrevie con "…" en vez de romper
+ * el ancho de la tarjeta) trae `overflow: hidden` en el MISMO elemento que
+ * el texto. Confirmado descargando el PNG real: con `leading-tight` html2canvas
+ * termina pintando este texto extrabold más alto que la caja de línea que le
+ * calculó, y como el overflow-hidden está en ese mismo span, se autorrecorta
+ * la parte de arriba de cada letra — invisible en pantalla (el navegador sí
+ * calcula bien su propia caja), solo aparece en la imagen exportada. Con
+ * `leading-normal` la caja de línea queda con margen de sobra y deja de pasar.
  */
 function ScoreRow({ label, scores, win }: { label: string; scores: number[]; win: boolean }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <span
-        className="min-w-0 truncate text-[26px] font-extrabold uppercase leading-tight tracking-tight"
+        className="min-w-0 truncate text-[26px] font-extrabold leading-normal tracking-tight"
         style={{ color: win ? ACCENT_GREEN : "#ffffff" }}
       >
-        {label}
+        {label.toUpperCase()}
       </span>
       <div className="flex shrink-0 items-center gap-2">
         {scores.map((s, i) =>
@@ -158,7 +171,7 @@ function Row({ label, score, win, compact }: { label: string; score: string; win
   return (
     <div className="flex items-center justify-between gap-4">
       <span
-        className={`min-w-0 truncate ${compact ? "text-[22px]" : "text-[28px]"} font-medium ${win ? "font-bold" : "text-white/70"}`}
+        className={`min-w-0 truncate leading-normal ${compact ? "text-[22px]" : "text-[28px]"} font-medium ${win ? "font-bold" : "text-white/70"}`}
         style={winStyle}
       >
         {label}
@@ -193,8 +206,8 @@ export const ResultStickerCapture = forwardRef<
 function AnnounceSticker({ item }: { item: Extract<ContentItem, { type: "upcoming" }> }) {
   return (
     <div className="flex w-full flex-col gap-3 rounded-3xl bg-white/12 p-8">
-      <span className="text-[20px] font-semibold uppercase tracking-wide opacity-80">
-        {item.time} {item.court ? `· ${item.court}` : ""}
+      <span className="text-[20px] font-semibold tracking-wide opacity-80">
+        {`${item.time}${item.court ? ` · ${item.court}` : ""}`.toUpperCase()}
       </span>
       <span className="text-[30px] font-semibold leading-snug">
         {item.teamA.label} <span className="opacity-60">vs</span> {item.teamB.label}
@@ -207,7 +220,7 @@ function AnnounceSticker({ item }: { item: Extract<ContentItem, { type: "upcomin
 function SummarySticker({ item }: { item: Extract<ContentItem, { type: "summary" }> }) {
   return (
     <div className="flex w-full flex-col gap-4 rounded-3xl bg-white/12 p-8">
-      <span className="text-[24px] font-semibold uppercase tracking-wide">Resultados del día</span>
+      <span className="text-[24px] font-semibold tracking-wide">RESULTADOS DEL DÍA</span>
       <div className="flex flex-col gap-2.5">
         {item.results.slice(0, 6).map((r, i) => (
           <div key={i} className="flex items-center justify-between gap-3 border-b border-white/15 pb-2 text-[18px] last:border-0">
@@ -322,7 +335,7 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
           está habilitado, ya lo trae él mismo (StickerWatermark, dentro de su propia
           tarjeta); acá solo se muestra cuando no hay marcador para no duplicarlo. */}
       {!(item.type === "result" && showScore) && (
-        <div className="absolute bottom-2 right-4 text-[11px] font-medium uppercase tracking-widest opacity-50">Padel Platform</div>
+        <div className="absolute bottom-2 right-4 text-[11px] font-medium tracking-widest opacity-50">PADEL PLATFORM</div>
       )}
     </div>
   );
