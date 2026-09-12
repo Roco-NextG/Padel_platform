@@ -245,6 +245,24 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
   const [slideIndex, setSlideIndex] = useState(0);
   const currentSlideItem = slideItems[Math.min(slideIndex, slideItems.length - 1)] ?? null;
 
+  // Tamaño REAL (sin escalar) del nodo que "Copiar sticker" captura — antes la
+  // vista previa metía el mismo markup (pensado para un ancho de 640px) forzado
+  // dentro de una caja de 220px sin ningún transform, así que el texto salía
+  // enorme y se recortaba. Con el tamaño real medido acá se puede escalar el
+  // preview igual que el slide grande (mismo truco: wrapper del tamaño visual
+  // final + transform:scale en el hijo), quedando proporcional a como se ve
+  // embebido en el post.
+  const [stickerNaturalSize, setStickerNaturalSize] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    const node = stickerRef.current;
+    if (!node) return;
+    const measure = () => setStickerNaturalSize({ width: node.offsetWidth, height: node.offsetHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, [currentSlideItem, scoreStyle]);
+
   function selectItem(item: ContentItem) {
     setActiveItemId(item.id);
     setSlideIndex(0);
@@ -576,7 +594,7 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
               {/* Fondo a cuadros clásico de "esto es transparente" — para que el usuario vea,
                   antes de copiar, que alrededor de la franja/tarjeta/ganador no viaja nada más
                   (ni fondo, ni logo, ni el nombre de la app). */}
-              {showStickerPreview && (
+              {showStickerPreview && stickerNaturalSize && (
                 <div
                   className="flex items-center justify-center rounded-md border border-border p-3"
                   style={{
@@ -585,9 +603,17 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
                     backgroundSize: "16px 16px",
                   }}
                 >
-                  <div style={{ width: 220 }} className="text-white">
-                    <ResultSticker item={currentSlideItem} style={scoreStyle} />
-                  </div>
+                  {(() => {
+                    const previewW = 200;
+                    const scale = previewW / stickerNaturalSize.width;
+                    return (
+                      <div style={{ width: previewW, height: stickerNaturalSize.height * scale, overflow: "hidden" }}>
+                        <div style={{ width: stickerNaturalSize.width, transform: `scale(${scale})`, transformOrigin: "top left" }} className="text-white">
+                          <ResultSticker item={currentSlideItem} style={scoreStyle} sticker />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
