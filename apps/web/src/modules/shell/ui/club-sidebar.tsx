@@ -9,8 +9,8 @@ import {
   CalendarBlank,
   UsersThree,
   ImageSquare,
-  GearSix,
   CaretDown,
+  CaretRight,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
@@ -111,18 +111,20 @@ export function ClubSidebar({
 
       <div className="h-px bg-border" />
 
+      {/* Configuración vive acá — pedido explícito: en vez de un link aparte
+          en la nav, toda la tarjeta de usuario/club es el punto de entrada a
+          /dashboard/configuracion (perfil + pistas). No se abre como panel
+          flotante: esa pantalla es un server component con Server Actions
+          (ProfileForm) y un CRUD completo (CourtsManager), demasiado para un
+          dropdown chico — navega a la ruta ya construida, misma página de
+          siempre. */}
       <Link
         href="/dashboard/configuracion"
         className={cn(
-          "flex items-center gap-2.5 rounded-[11px] px-2.5 py-2 text-[13.5px] transition-colors",
-          isActive(pathname, "/dashboard/configuracion") ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground"
+          "mt-auto flex items-center gap-2.5 rounded-xl border border-border bg-surface p-2.5 transition-colors hover:border-border-strong",
+          isActive(pathname, "/dashboard/configuracion") && "border-border-strong"
         )}
       >
-        <GearSix className="size-[17px]" />
-        Configuración
-      </Link>
-
-      <div className="mt-auto flex items-center gap-2.5 rounded-xl border border-border bg-surface p-2.5">
         <div
           className="flex size-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-accent-foreground"
           style={{ background: "linear-gradient(160deg, #dce8b0, var(--accent))" }}
@@ -133,8 +135,8 @@ export function ClubSidebar({
           <div className="truncate text-[13px] font-medium leading-tight text-foreground">{contactName}</div>
           <div className="truncate text-[11px] text-muted-foreground">{accountRole}</div>
         </div>
-        <CaretDown className="ml-auto size-3.5 shrink-0 text-foreground-tertiary" weight="bold" />
-      </div>
+        <CaretRight className="ml-auto size-3.5 shrink-0 text-foreground-tertiary" weight="bold" />
+      </Link>
     </nav>
   );
 }
