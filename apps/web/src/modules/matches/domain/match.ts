@@ -111,3 +111,12 @@ export const MATCH_DISPLAY_STATUS_ORDER: Record<MatchDisplayStatus, number> = {
   DONE: 4,
   CANCELLED: 5,
 };
+
+/**
+ * Duración fija asumida por partido — no hay ningún concepto de duración
+ * modelado todavía. Pedido explícito: 1h bloqueada en el planificador al
+ * agendar. Única fuente de verdad — antes vivía duplicada (y desincronizada)
+ * en matchActions.ts (servidor) y scheduler-board.tsx (pre-chequeo optimista
+ * en cliente), cada una con su propio "90" hardcodeado.
+ */
+export const MATCH_DURATION_MINUTES = 60;
