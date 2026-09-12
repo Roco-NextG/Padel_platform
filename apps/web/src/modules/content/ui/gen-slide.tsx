@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import type { BackgroundStyle, ContentItem, FormatDef, ScoreStickerStyle } from "../domain/content";
 
@@ -80,7 +80,9 @@ export function ResultSticker({
         >
           GANADOR
         </span>
-        <span className="max-w-full truncate text-[44px] font-bold leading-normal">{winnerLabel}</span>
+        <span className="max-w-full text-[44px] font-bold leading-normal" style={ELLIPSIS_NO_VCLIP}>
+          {winnerLabel}
+        </span>
         <span className="text-[24px] font-medium opacity-80">{scoreLine}</span>
         <StickerWatermark />
       </div>
@@ -118,6 +120,59 @@ export function ResultSticker({
 const ACCENT_GREEN = "#c8ef5a";
 
 /**
+ * Caja de 36x36 para un solo dígito — SOLO tamaño/centrado horizontal y de
+ * fondo (círculo o no). No lleva ningún ajuste vertical: eso vive aparte en
+ * `DIGIT_NUDGE`, sobre un span interno propio, porque aplicar el ajuste acá
+ * mueve el círculo entero (fondo incluido) en vez de mover el dígito DENTRO
+ * del círculo — confirmado con el PNG real cuando probé exactamente eso.
+ */
+const DIGIT_CENTER_BOX: CSSProperties = {
+  display: "flex",
+  width: 36,
+  height: 36,
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+/**
+ * Empuja el dígito hacia arriba DENTRO de su caja ya centrada. Medido pixel
+ * a pixel sobre el PNG real exportado (en el visualizador del navegador
+ * siempre se ve centrado, ahí no se nota nada): html2canvas rasteriza este
+ * texto más abajo del centro real de la caja, sin importar si esa caja
+ * centra por flexbox o por line-height — mismo desfasaje con los dos
+ * mecanismos, así que no es un problema de CSS sino de cómo html2canvas
+ * ubica el baseline del texto al rasterizar. El desfasaje crece con el
+ * font-size (18px necesitó -8px, 22px necesitó -14px — no es la misma
+ * proporción, así que hay un valor por tamaño, no una sola constante).
+ * Valores medidos, no estéticos: si cambia el font-size de estos dígitos hay
+ * que volver a medir contra un PNG descargado de verdad, no alcanza con
+ * mirar la pantalla.
+ */
+const DIGIT_NUDGE_18: CSSProperties = { display: "inline-block", transform: "translateY(-8px)" };
+const DIGIT_NUDGE_22: CSSProperties = { display: "inline-block", transform: "translateY(-14px)" };
+
+/**
+ * Reemplaza a mano la clase `truncate` de Tailwind (`overflow:hidden;
+ * text-overflow:ellipsis; white-space:nowrap`) para un nombre de equipo
+ * largo, que necesita abreviarse con "…" en ANCHO pero no debe recortarse en
+ * ALTO. `overflow:hidden` de `truncate` clipea ambos ejes, y confirmado
+ * descargando el PNG real (no alcanza con ver el visualizador: ahí siempre
+ * se veía bien) — html2canvas pinta este texto extrabold un poco más alto de
+ * lo que él mismo calculó para la caja de línea, y con overflow:hidden en el
+ * mismo span eso se traduce en la parte de arriba de cada letra recortada.
+ * Subir el line-height (`leading-normal`) no alcanzó para eliminarlo del
+ * todo. `overflow-y: visible` dejar pasar ese margen de más sin afectar el
+ * recorte horizontal, que sigue haciendo `overflow-x: hidden` +
+ * `text-overflow: ellipsis`.
+ */
+const ELLIPSIS_NO_VCLIP: CSSProperties = {
+  overflowX: "hidden",
+  overflowY: "visible",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+/**
  * Fila de marcador estilo "cobertura deportiva" (pedido explícito: replicar
  * un sticker de referencia) — el ganador se resalta en verde con cada set
  * dentro de un círculo relleno; el perdedor queda en blanco liso, sin
@@ -126,22 +181,13 @@ const ACCENT_GREEN = "#c8ef5a";
  * El nombre va en mayúsculas vía .toUpperCase() del string (no con la clase
  * `uppercase` de Tailwind, aunque eso resultó no ser la causa del recorte —
  * se mantiene igual porque es más explícito para el lector).
- *
- * `truncate` (para que un nombre largo se abrevie con "…" en vez de romper
- * el ancho de la tarjeta) trae `overflow: hidden` en el MISMO elemento que
- * el texto. Confirmado descargando el PNG real: con `leading-tight` html2canvas
- * termina pintando este texto extrabold más alto que la caja de línea que le
- * calculó, y como el overflow-hidden está en ese mismo span, se autorrecorta
- * la parte de arriba de cada letra — invisible en pantalla (el navegador sí
- * calcula bien su propia caja), solo aparece en la imagen exportada. Con
- * `leading-normal` la caja de línea queda con margen de sobra y deja de pasar.
  */
 function ScoreRow({ label, scores, win }: { label: string; scores: number[]; win: boolean }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <span
-        className="min-w-0 truncate text-[26px] font-extrabold leading-normal tracking-tight"
-        style={{ color: win ? ACCENT_GREEN : "#ffffff" }}
+        className="min-w-0 text-[26px] font-extrabold leading-normal tracking-tight"
+        style={{ color: win ? ACCENT_GREEN : "#ffffff", ...ELLIPSIS_NO_VCLIP }}
       >
         {label.toUpperCase()}
       </span>
@@ -150,14 +196,14 @@ function ScoreRow({ label, scores, win }: { label: string; scores: number[]; win
           win ? (
             <span
               key={i}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full text-[18px] font-extrabold leading-none text-black"
-              style={{ backgroundColor: ACCENT_GREEN }}
+              className="shrink-0 text-[18px] font-extrabold text-black"
+              style={{ ...DIGIT_CENTER_BOX, backgroundColor: ACCENT_GREEN, borderRadius: 9999 }}
             >
-              {s}
+              <span style={DIGIT_NUDGE_18}>{s}</span>
             </span>
           ) : (
-            <span key={i} className="flex size-9 shrink-0 items-center justify-center text-[22px] font-semibold leading-none text-white">
-              {s}
+            <span key={i} className="shrink-0 text-[22px] font-semibold text-white" style={DIGIT_CENTER_BOX}>
+              <span style={DIGIT_NUDGE_22}>{s}</span>
             </span>
           )
         )}
@@ -171,8 +217,8 @@ function Row({ label, score, win, compact }: { label: string; score: string; win
   return (
     <div className="flex items-center justify-between gap-4">
       <span
-        className={`min-w-0 truncate leading-normal ${compact ? "text-[22px]" : "text-[28px]"} font-medium ${win ? "font-bold" : "text-white/70"}`}
-        style={winStyle}
+        className={`min-w-0 leading-normal ${compact ? "text-[22px]" : "text-[28px]"} font-medium ${win ? "font-bold" : "text-white/70"}`}
+        style={{ ...winStyle, ...ELLIPSIS_NO_VCLIP }}
       >
         {label}
       </span>
@@ -224,7 +270,7 @@ function SummarySticker({ item }: { item: Extract<ContentItem, { type: "summary"
       <div className="flex flex-col gap-2.5">
         {item.results.slice(0, 6).map((r, i) => (
           <div key={i} className="flex items-center justify-between gap-3 border-b border-white/15 pb-2 text-[18px] last:border-0">
-            <span className="truncate">
+            <span className="leading-normal" style={ELLIPSIS_NO_VCLIP}>
               {r.teamA} <span className="opacity-50">vs</span> {r.teamB}
             </span>
             <span className="shrink-0 font-semibold tabular-nums">{r.score}</span>
