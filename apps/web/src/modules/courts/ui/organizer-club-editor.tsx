@@ -41,6 +41,8 @@ export function OrganizerClubEditor({ club, courts }: { club: OrganizerCreatedCl
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        aria-label={expanded ? `Ocultar datos de ${club.clubName}` : `Editar datos de ${club.clubName}`}
         className="flex w-full items-center gap-2.5 p-4 text-left"
       >
         <Buildings className="size-4 shrink-0 text-muted-foreground" />
