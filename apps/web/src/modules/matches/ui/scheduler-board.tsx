@@ -7,7 +7,7 @@ import { CaretLeft, CaretRight, X } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { zonedDateKey, zonedSlotToIso, zonedTimeKey, shiftZonedDateKey } from "@/lib/timezone";
 import { scheduleMatchAction, unscheduleMatchAction } from "../application/matchActions";
-import { matchTeamLabel, type MatchListItem } from "../domain/match";
+import { MATCH_DURATION_MINUTES, matchTeamLabel, type MatchListItem } from "../domain/match";
 
 const START_HOUR = 8;
 const END_HOUR = 24; // exclusivo — el último slot es 23:30
@@ -56,14 +56,17 @@ function SlotCell({
   courtId,
   time,
   match,
+  blockedBy,
   onUnschedule,
 }: {
   courtId: string;
   time: string;
   match: MatchListItem | undefined;
+  /** Set cuando esta celda cae DENTRO de la duración de un partido agendado en un slot anterior (no es su inicio) — bloqueada para soltar otro partido, sin chip propio. */
+  blockedBy: MatchListItem | undefined;
   onUnschedule: (matchId: string) => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `cell:${courtId}:${time}` });
+  const { setNodeRef, isOver } = useDroppable({ id: `cell:${courtId}:${time}`, disabled: !!blockedBy });
   const removable = match && !LOCKED_STATUSES.has(match.status);
 
   return (
@@ -73,7 +76,8 @@ function SlotCell({
         "relative min-h-11 border border-border bg-surface-secondary p-0.5 transition-colors",
         isOver && !match && "bg-accent-muted shadow-[inset_0_0_0_2px_var(--accent-strong)]",
         isOver && match && "bg-destructive-muted shadow-[inset_0_0_0_2px_var(--destructive)]",
-        match && "bg-surface"
+        match && "bg-surface",
+        blockedBy && "bg-[repeating-linear-gradient(135deg,var(--border)_0px,var(--border)_4px,transparent_4px,transparent_9px)]"
       )}
     >
       {match && (
@@ -150,15 +154,28 @@ export function SchedulerBoard({
     [matches, categoryFilter]
   );
 
-  const placedByCell = useMemo(() => {
-    const map = new Map<string, MatchListItem>();
+  // blockedCells: celdas posteriores a la de inicio que caen dentro de la
+  // duración REAL del partido (scheduledStart→scheduledEnd ya guardados en
+  // BD), no un valor fijo acá — así un partido agendado con una duración
+  // vieja (90 min, antes de este cambio) sigue bloqueando visualmente lo que
+  // de verdad tiene reservado, y uno nuevo de 60 min bloquea exactamente 1
+  // celda extra (slots de 30 min).
+  const { placedByCell, blockedCells } = useMemo(() => {
+    const placed = new Map<string, MatchListItem>();
+    const blocked = new Map<string, MatchListItem>();
     for (const m of matches) {
       if (!m.scheduledStart || !m.courtId) continue;
       if (categoryFilter !== "Todas" && m.categoryName !== categoryFilter) continue;
       if (zonedDateKey(m.scheduledStart, clubTimeZone) !== selectedDate) continue;
-      map.set(`${m.courtId}:${zonedTimeKey(m.scheduledStart, clubTimeZone)}`, m);
+      placed.set(`${m.courtId}:${zonedTimeKey(m.scheduledStart, clubTimeZone)}`, m);
+      if (!m.scheduledEnd) continue;
+      const startMs = new Date(m.scheduledStart).getTime();
+      const endMs = new Date(m.scheduledEnd).getTime();
+      for (let t = startMs + 30 * 60_000; t < endMs; t += 30 * 60_000) {
+        blocked.set(`${m.courtId}:${zonedTimeKey(new Date(t).toISOString(), clubTimeZone)}`, m);
+      }
     }
-    return map;
+    return { placedByCell: placed, blockedCells: blocked };
   }, [matches, selectedDate, categoryFilter, clubTimeZone]);
 
   function applyScheduleUpdate(matchId: string, courtId: string | null, scheduledStart: string | null, scheduledEnd: string | null) {
@@ -196,7 +213,7 @@ export function SchedulerBoard({
     if (!courtId || !time) return;
 
     const scheduledStartIso = zonedSlotToIso(selectedDate, time, clubTimeZone);
-    const scheduledEnd = new Date(new Date(scheduledStartIso).getTime() + 90 * 60_000).toISOString();
+    const scheduledEnd = new Date(new Date(scheduledStartIso).getTime() + MATCH_DURATION_MINUTES * 60_000).toISOString();
     const conflict = matches.some(
       (m) =>
         m.id !== matchId &&
@@ -301,7 +318,14 @@ export function SchedulerBoard({
                       {time}
                     </div>
                     {courts.map((c) => (
-                      <SlotCell key={c.id} courtId={c.id} time={time} match={placedByCell.get(`${c.id}:${time}`)} onUnschedule={handleUnschedule} />
+                      <SlotCell
+                        key={c.id}
+                        courtId={c.id}
+                        time={time}
+                        match={placedByCell.get(`${c.id}:${time}`)}
+                        blockedBy={blockedCells.get(`${c.id}:${time}`)}
+                        onUnschedule={handleUnschedule}
+                      />
                     ))}
                   </div>
                 ))}

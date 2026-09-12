@@ -15,7 +15,7 @@ import {
   setMatchSchedule,
   submitResult,
 } from "../infrastructure/matchRepository";
-import { resolveScoringConfig } from "../domain/match";
+import { MATCH_DURATION_MINUTES, resolveScoringConfig } from "../domain/match";
 import { requireTournamentManager } from "@/modules/tournaments/application/authGuard";
 import { reconcileBracket } from "@/modules/tournaments/infrastructure/bracketRepository";
 import type { ScoringConfigJson } from "@/lib/supabase/database.types";
@@ -120,9 +120,6 @@ export async function setMatchCourtAction(tournamentId: string, matchId: string,
   revalidatePath("/dashboard/partidos");
   return { error: null };
 }
-
-/** Duración fija asumida por partido — no hay ningún concepto de duración modelado todavía; 90 min es razonable para pádel y solo se usa para detectar choques de horario en la misma pista. */
-const MATCH_DURATION_MINUTES = 90;
 
 export async function scheduleMatchAction(
   tournamentId: string,
