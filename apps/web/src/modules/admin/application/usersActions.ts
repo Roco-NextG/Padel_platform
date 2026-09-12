@@ -7,9 +7,12 @@ import {
   changeAccountPlan,
   createAccountWithInvite,
   deleteAccount,
+  fetchAccountDetail,
   makeAdmin,
   revokeAdmin,
   setAccountActive,
+  updateAccountDetail,
+  type AccountDetail,
   type PlatformAccountType,
 } from "../infrastructure/usersRepository";
 import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
@@ -143,6 +146,45 @@ export async function setAccountActiveAction(
   revalidatePath("/admin");
   revalidatePath("/admin/usuarios");
   return { error: null };
+}
+
+export interface AccountDetailState {
+  error: string | null;
+  detail: AccountDetail | null;
+}
+
+export async function fetchAccountDetailAction(accountType: PlatformAccountType, entityId: string): Promise<AccountDetailState> {
+  const auth = await requireAdmin();
+  if ("error" in auth) return { error: auth.error, detail: null };
+
+  try {
+    const detail = await fetchAccountDetail(accountType, entityId);
+    return { error: null, detail };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo cargar el detalle.", detail: null };
+  }
+}
+
+export interface UpdateAccountDetailState {
+  error: string | null;
+  displayName: string | null;
+}
+
+export async function updateAccountDetailAction(
+  accountType: PlatformAccountType,
+  entityId: string,
+  detail: AccountDetail
+): Promise<UpdateAccountDetailState> {
+  const auth = await requireAdmin();
+  if ("error" in auth) return { error: auth.error, displayName: null };
+
+  try {
+    const displayName = await updateAccountDetail(accountType, entityId, detail);
+    revalidatePath("/admin/usuarios");
+    return { error: null, displayName };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo guardar.", displayName: null };
+  }
 }
 
 export async function changePlanAction(
