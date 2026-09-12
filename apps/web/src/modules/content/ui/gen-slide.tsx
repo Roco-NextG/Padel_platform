@@ -15,16 +15,53 @@ const BG_PRESETS: Record<Exclude<BackgroundStyle, "upload">, string> = {
  * texto blanco sobre nada es invisible en cuanto el sticker se pega sobre un
  * fondo claro (confirmado con el screenshot de WhatsApp del usuario).
  */
-function StickerWatermark({ compact }: { compact?: boolean }) {
+function StickerWatermark({ compact, centered }: { compact?: boolean; centered?: boolean }) {
   return (
-    <span className={cn("self-end font-medium uppercase tracking-widest text-white/45", compact ? "text-[10px]" : "text-[11px]")}>
+    <span
+      className={cn(
+        "font-medium uppercase tracking-widest text-white/45",
+        centered ? "self-center" : "self-end",
+        compact ? "text-[10px]" : "text-[11px]"
+      )}
+    >
       Padel Platform
     </span>
   );
 }
 
-export function ResultSticker({ item, style }: { item: Extract<ContentItem, { type: "result" }>; style: ScoreStickerStyle }) {
-  const winnerLabel = item.winner === "a" ? item.teamA.label : item.teamB.label;
+/**
+ * "Javier Campos / Alberto Moreno" -> "J. Campos / A. Moreno" — a pedido
+ * explícito, y SOLO para el sticker aislado (nunca para el marcador
+ * embebido en el post completo, que tiene mucho más ancho disponible): a
+ * 640px de ancho fijo, un nombre de pareja completo empuja el texto contra
+ * los círculos del marcador y termina cortado a la mitad de una letra en
+ * vez de acortarse con "…" (confirmado con el PNG real: el flex del label
+ * no se achica dentro de un `justify-between` sin min-width:0, así que se
+ * arregla también eso, pero abreviar es lo que evita llegar a necesitarlo).
+ */
+function abbreviateTeamLabel(label: string): string {
+  return label
+    .split(" / ")
+    .map((name) => {
+      const parts = name.trim().split(/\s+/).filter(Boolean);
+      if (parts.length < 2) return name.trim();
+      return `${parts[0][0]}. ${parts.slice(1).join(" ")}`;
+    })
+    .join(" / ");
+}
+
+export function ResultSticker({
+  item,
+  style,
+  sticker,
+}: {
+  item: Extract<ContentItem, { type: "result" }>;
+  style: ScoreStickerStyle;
+  /** true SOLO en el sticker aislado (ResultStickerCapture y sus previews) — abrevia nombres largos. */
+  sticker?: boolean;
+}) {
+  const label = (l: string) => (sticker ? abbreviateTeamLabel(l) : l);
+  const winnerLabel = label(item.winner === "a" ? item.teamA.label : item.teamB.label);
   const scoreLine = item.sets.map(([a, b]) => `${a}-${b}`).join("  ");
 
   // Antes estas tarjetas usaban bg-white/12-15 (translúcido) — se veían bien
@@ -36,9 +73,14 @@ export function ResultSticker({ item, style }: { item: Extract<ContentItem, { ty
   // detrás — claro u oscuro.
   if (style === "winner") {
     return (
-      <div className="flex w-full flex-col items-center gap-3 rounded-3xl bg-black/85 p-8 text-center">
-        <span className="rounded-full bg-white px-5 py-1.5 text-[22px] font-semibold uppercase tracking-wide text-black">Ganador</span>
-        <span className="text-[44px] font-bold leading-tight">{winnerLabel}</span>
+      <div className="flex w-full flex-col items-center gap-3 overflow-hidden rounded-3xl bg-black/85 p-8 text-center">
+        <span
+          className="rounded-full px-5 py-1.5 text-[22px] font-semibold uppercase tracking-wide text-black"
+          style={{ backgroundColor: ACCENT_GREEN }}
+        >
+          Ganador
+        </span>
+        <span className="max-w-full truncate text-[44px] font-bold leading-tight">{winnerLabel}</span>
         <span className="text-[24px] font-medium opacity-80">{scoreLine}</span>
         <StickerWatermark />
       </div>
@@ -47,30 +89,83 @@ export function ResultSticker({ item, style }: { item: Extract<ContentItem, { ty
 
   if (style === "card") {
     return (
-      <div className="flex w-full flex-col gap-3 rounded-3xl bg-black/85 p-8">
-        <Row label={item.teamA.label} score={item.sets.map(([a]) => a).join(" ")} win={item.winner === "a"} />
-        <Row label={item.teamB.label} score={item.sets.map(([, b]) => b).join(" ")} win={item.winner === "b"} />
-        <StickerWatermark />
+      <div
+        className="flex w-full flex-col gap-4 overflow-hidden rounded-[28px] p-8 shadow-2xl"
+        style={{
+          background:
+            "radial-gradient(circle at 12% 0%, rgba(146,204,24,0.28), transparent 55%), linear-gradient(160deg, #10230f 0%, #0b1a0a 55%, #0a1509 100%)",
+        }}
+      >
+        <ScoreRow label={label(item.teamA.label)} scores={item.sets.map(([a]) => a)} win={item.winner === "a"} />
+        <ScoreRow label={label(item.teamB.label)} scores={item.sets.map(([, b]) => b)} win={item.winner === "b"} />
+        <div className="mt-1 flex items-center justify-center">
+          <StickerWatermark centered />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex w-full flex-col gap-2 rounded-xl bg-black/85 px-6 py-4">
-      <Row label={item.teamA.label} score={item.sets.map(([a]) => a).join(" ")} win={item.winner === "a"} compact />
-      <Row label={item.teamB.label} score={item.sets.map(([, b]) => b).join(" ")} win={item.winner === "b"} compact />
+    <div className="flex w-full flex-col gap-2 overflow-hidden rounded-xl bg-black/85 px-6 py-4">
+      <Row label={label(item.teamA.label)} score={item.sets.map(([a]) => a).join(" ")} win={item.winner === "a"} compact />
+      <Row label={label(item.teamB.label)} score={item.sets.map(([, b]) => b).join(" ")} win={item.winner === "b"} compact />
       <StickerWatermark compact />
     </div>
   );
 }
 
-function Row({ label, score, win, compact }: { label: string; score: string; win: boolean; compact?: boolean }) {
+/** Verde de marca ya usado en BG_PRESETS.glow — mismo tono en todo el archivo. */
+const ACCENT_GREEN = "#c8ef5a";
+
+/**
+ * Fila de marcador estilo "cobertura deportiva" (pedido explícito: replicar
+ * un sticker de referencia) — el ganador se resalta en verde con cada set
+ * dentro de un círculo relleno; el perdedor queda en blanco liso, sin
+ * círculo, para que la jerarquía visual sea obvia de un vistazo.
+ */
+function ScoreRow({ label, scores, win }: { label: string; scores: number[]; win: boolean }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className={`truncate ${compact ? "text-[22px]" : "text-[28px]"} font-medium ${win ? "font-bold text-white" : "text-white/70"}`}>
+      <span
+        className="min-w-0 truncate text-[26px] font-extrabold uppercase leading-tight tracking-tight"
+        style={{ color: win ? ACCENT_GREEN : "#ffffff" }}
+      >
         {label}
       </span>
-      <span className={`shrink-0 tabular-nums ${compact ? "text-[22px]" : "text-[28px]"} font-semibold`}>{score}</span>
+      <div className="flex shrink-0 items-center gap-2">
+        {scores.map((s, i) =>
+          win ? (
+            <span
+              key={i}
+              className="flex size-9 shrink-0 items-center justify-center rounded-full text-[18px] font-extrabold leading-none text-black"
+              style={{ backgroundColor: ACCENT_GREEN }}
+            >
+              {s}
+            </span>
+          ) : (
+            <span key={i} className="flex size-9 shrink-0 items-center justify-center text-[22px] font-semibold leading-none text-white">
+              {s}
+            </span>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, score, win, compact }: { label: string; score: string; win: boolean; compact?: boolean }) {
+  const winStyle = win ? { color: ACCENT_GREEN } : undefined;
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span
+        className={`min-w-0 truncate ${compact ? "text-[22px]" : "text-[28px]"} font-medium ${win ? "font-bold" : "text-white/70"}`}
+        style={winStyle}
+      >
+        {label}
+      </span>
+      <span className={`shrink-0 tabular-nums ${compact ? "text-[22px]" : "text-[28px]"} font-semibold ${win ? "" : "text-white"}`} style={winStyle}>
+        {score}
+      </span>
     </div>
   );
 }
@@ -90,7 +185,7 @@ export const ResultStickerCapture = forwardRef<
 >(function ResultStickerCapture({ item, style }, ref) {
   return (
     <div ref={ref} style={{ width: 640 }} className="inline-block text-white">
-      <ResultSticker item={item} style={style} />
+      <ResultSticker item={item} style={style} sticker />
     </div>
   );
 });
@@ -153,8 +248,8 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
   // derecho — la franja/tarjeta/ganador necesita ceder ese margen ahí, no en post/carrusel.
   const isVerticalFormat = format.id === "story" || format.id === "tiktok";
   // Ancho "grande" pero proporcional: reservado como % del lienzo, no un px fijo, para que
-  // escale igual si algún formato futuro cambia de ancho.
-  const sponsorLogoWidth = format.width * 0.16;
+  // escale igual si algún formato futuro cambia de ancho. 0.8 = 20% más chico (pedido explícito).
+  const sponsorLogoWidth = format.width * 0.16 * 0.8;
 
   return (
     <div
@@ -170,17 +265,6 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
     >
       <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/20 to-black/60" />
 
-      {showLogo &&
-        (tournamentLogoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={tournamentLogoUrl}
-            alt={tournamentName}
-            className="absolute left-12 top-12 size-14 rounded-full border-2 border-white/40 bg-white/15 object-cover"
-          />
-        ) : (
-          <div className="absolute left-12 top-12 rounded-full bg-white/15 px-5 py-2 text-[22px] font-semibold">{tournamentName}</div>
-        ))}
       <div className="absolute right-12 top-12 text-[18px] font-semibold opacity-85">{item.dateLabel}</div>
 
       <div className={cn("absolute inset-0 flex items-end p-12", isVerticalFormat && "pr-36")}>
@@ -189,21 +273,31 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
         {item.type === "summary" && <SummarySticker item={item} />}
       </div>
 
-      {/* Lateral izquierdo, sin caja/fondo detrás (el propio PNG del sponsor ya trae su
-          transparencia) — pedido explícito, antes era una insignia circular con iniciales
-          abajo a la derecha, sin usar el logo real en absoluto. */}
-      {showSponsors && sponsors.length > 0 && (
-        <div className="absolute left-6 top-1/2 flex -translate-y-1/2 flex-col gap-5" style={{ width: sponsorLogoWidth }}>
-          {sponsors.slice(0, 4).map((s) =>
-            s.logoUrl ? (
+      {/* Esquina superior izquierda, un solo stack con el logo del torneo primero y
+          los sponsors debajo — mismo tamaño para todos, sin caja/fondo detrás (el
+          propio PNG ya trae su transparencia, y el del torneo se procesa igual
+          que los de sponsors). Pedido explícito: dejaron de ser dos elementos
+          sueltos de tamaño y posición distinta. */}
+      {(showLogo || (showSponsors && sponsors.length > 0)) && (
+        <div className="absolute left-6 top-6 flex flex-col gap-4" style={{ width: sponsorLogoWidth }}>
+          {showLogo &&
+            (tournamentLogoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img key={s.id} src={s.logoUrl} alt={s.name} className="w-full object-contain drop-shadow-lg" />
+              <img src={tournamentLogoUrl} alt={tournamentName} className="w-full object-contain drop-shadow-lg" />
             ) : (
-              <div key={s.id} className="flex aspect-square w-full items-center justify-center rounded-full bg-white/18 text-[14px] font-bold">
-                {s.name.slice(0, 2).toUpperCase()}
-              </div>
-            )
-          )}
+              <div className="rounded-full bg-white/18 px-4 py-2 text-center text-[14px] font-semibold">{tournamentName}</div>
+            ))}
+          {showSponsors &&
+            sponsors.slice(0, 4).map((s) =>
+              s.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={s.id} src={s.logoUrl} alt={s.name} className="w-full object-contain drop-shadow-lg" />
+              ) : (
+                <div key={s.id} className="flex aspect-square w-full items-center justify-center rounded-full bg-white/18 text-[14px] font-bold">
+                  {s.name.slice(0, 2).toUpperCase()}
+                </div>
+              )
+            )}
         </div>
       )}
 
@@ -224,7 +318,12 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
         </div>
       )}
 
-      <div className="absolute bottom-2 right-4 text-[11px] font-medium uppercase tracking-widest opacity-50">Padel Platform</div>
+      {/* El nombre de la app debe aparecer UNA sola vez en el slide — si el marcador
+          está habilitado, ya lo trae él mismo (StickerWatermark, dentro de su propia
+          tarjeta); acá solo se muestra cuando no hay marcador para no duplicarlo. */}
+      {!(item.type === "result" && showScore) && (
+        <div className="absolute bottom-2 right-4 text-[11px] font-medium uppercase tracking-widest opacity-50">Padel Platform</div>
+      )}
     </div>
   );
 });
