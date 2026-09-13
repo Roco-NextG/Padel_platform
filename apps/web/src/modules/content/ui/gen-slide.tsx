@@ -310,9 +310,15 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
           los sponsors debajo — mismo tamaño para todos, sin caja/fondo detrás (el
           propio PNG ya trae su transparencia, y el del torneo se procesa igual
           que los de sponsors). Pedido explícito: dejaron de ser dos elementos
-          sueltos de tamaño y posición distinta. */}
+          sueltos de tamaño y posición distinta.
+          En Story/TikTok bajamos el stack (top-28 en vez de top-6): esas apps
+          dibujan su propia cabecera (foto de perfil + usuario) pegada a la
+          esquina superior izquierda al publicar, y a top-6 quedaba tapado. */}
       {(showLogo || (showSponsors && sponsors.length > 0)) && (
-        <div className="absolute left-6 top-6 flex flex-col gap-4" style={{ width: sponsorLogoWidth }}>
+        <div
+          className={cn("absolute left-6 top-6 flex flex-col gap-4", isVerticalFormat && "top-28")}
+          style={{ width: sponsorLogoWidth }}
+        >
           {showLogo &&
             (tournamentLogoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
