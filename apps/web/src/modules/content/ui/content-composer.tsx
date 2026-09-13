@@ -195,6 +195,34 @@ async function captureNode(node: HTMLElement, background: string | null): Promis
   return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/png"));
 }
 
+/** "Torneo Rommel #7" -> "torneo-rommel-7" — nombre de archivo, sin acentos ni caracteres que algunos SO rechazan. */
+function slugify(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Nombre del torneo + nombre de la app + fecha + número de secuencia — a
+ * pedido explícito, para poder identificar y ordenar los PNG descargados sin
+ * tener que abrir cada uno (antes era solo "padel-platform-{formato}-{id}",
+ * ilegible apenas se descargaban dos o tres). La secuencia (`seq`) es un
+ * contador por sesión del composer, no por día ni por torneo — arranca en 1
+ * cada vez que se abre/recarga la página y sube con cada exportación
+ * (descarga o compartir) para que nunca se pisen dos archivos entre sí.
+ */
+function buildExportFilename(tournamentName: string, seq: number): string {
+  const date = new Date();
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const seqStr = String(seq).padStart(2, "0");
+  return `padel-platform-${slugify(tournamentName)}-${y}${m}${d}-${seqStr}`;
+}
+
 /**
  * El logo que sube el club para un sponsor casi nunca viene ya preparado
  * para pegarse sobre un fondo de color (cancha/glow/mesh/foto) — trae su
@@ -289,6 +317,8 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
   const stickerRef = useRef<HTMLDivElement>(null);
   const previewBoxRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /** Contador de exportaciones (descargar/compartir) de esta sesión — ver buildExportFilename. */
+  const exportSeqRef = useRef(0);
 
   const results = dayItems.filter((i): i is Extract<ContentItem, { type: "result" }> => i.type === "result");
   const carruselItems = results.length > 0 ? results : dayItems;
@@ -350,10 +380,11 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
     withNode(async (node) => {
       const blob = await captureNode(node, "#16171a");
       if (!blob) return;
+      exportSeqRef.current += 1;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `padel-platform-${format}-${currentSlideItem?.id ?? "post"}.png`;
+      a.download = `${buildExportFilename(feed.tournamentName, exportSeqRef.current)}.png`;
       a.click();
       URL.revokeObjectURL(url);
     });
@@ -363,7 +394,8 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
     withNode(async (node) => {
       const blob = await captureNode(node, "#16171a");
       if (!blob) return;
-      const file = new File([blob], "padel-platform.png", { type: "image/png" });
+      exportSeqRef.current += 1;
+      const file = new File([blob], `${buildExportFilename(feed.tournamentName, exportSeqRef.current)}.png`, { type: "image/png" });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: feed.tournamentName });
       } else {
