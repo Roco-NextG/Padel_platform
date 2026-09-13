@@ -124,6 +124,51 @@ function inlineComputedStyles(source: Element, target: Element) {
   }
 }
 
+/**
+ * Correcciones que existen SOLO para el clon que arma html2canvas antes de
+ * rasterizar — nunca deben tocar el árbol en vivo (gen-slide.tsx), porque el
+ * bug que corrigen es exclusivo de cómo html2canvas mide/pinta texto, no de
+ * cómo lo layoutea el navegador real. Un intento anterior aplicó estas mismas
+ * correcciones directamente en los componentes en vivo y terminó rompiendo el
+ * visualizador (que nunca tuvo el bug) para arreglar solo la exportación.
+ * Se corre DESPUÉS de inlineComputedStyles, que si no pisa cualquier cambio
+ * hecho antes con su propio cssText calculado del nodo original.
+ *
+ * `[data-cc-label-fix]`: nombres de equipo largos, con `truncate` (que trae
+ * `overflow:hidden` + `text-overflow:ellipsis` para abreviar con "…" cuando
+ * no entran). Confirmado descargando el PNG real, probando cada variable por
+ * separado: `text-overflow:ellipsis` es lo que dispara el bug de html2canvas
+ * — no el alto del lienzo, no el line-height, no la posición del elemento
+ * (los tres se probaron y descartaron por separado). Se reproduce solo
+ * cuando el texto está cerca o pasado el ancho disponible (por eso Story/
+ * TikTok lo mostraban y Post/Carrusel no: esos formatos reservan una franja
+ * extra a la derecha — pr-36 en gen-slide.tsx — que angosta la tarjeta lo
+ * suficiente). El apaño es sacar el `text-overflow` de la ecuación en la
+ * exportación: `overflow:visible` + `white-space:nowrap` — un nombre
+ * larguísimo puede asomar un poco por el borde de la tarjeta en vez de
+ * cortarse con "…", pero eso es infinitamente mejor que texto ilegible. El
+ * sticker aislado abrevia los nombres aparte (abbreviateTeamLabel en
+ * gen-slide.tsx) así que ahí casi nunca se llega a ese límite.
+ *
+ * `[data-cc-digit-nudge]`: valor en px (string, puede ser negativo) medido
+ * pixel a pixel contra el PNG real — html2canvas rasteriza el número dentro
+ * del círculo sistemáticamente más abajo del centro de su caja. Si cambia el
+ * font-size de esos dígitos hay que volver a medir contra una descarga real,
+ * no alcanza con mirar la pantalla (ver ScoreRow en gen-slide.tsx).
+ */
+function applyExportOnlyFixups(clonedRoot: Element) {
+  clonedRoot.querySelectorAll<HTMLElement>("[data-cc-label-fix]").forEach((el) => {
+    el.style.overflow = "visible";
+    el.style.whiteSpace = "nowrap";
+    const fontSize = parseFloat(el.style.fontSize) || 16;
+    el.style.lineHeight = `${fontSize}px`;
+  });
+  clonedRoot.querySelectorAll<HTMLElement>("[data-cc-digit-nudge]").forEach((el) => {
+    const dy = el.getAttribute("data-cc-digit-nudge");
+    if (dy) el.style.transform = `translateY(${dy}px)`;
+  });
+}
+
 async function captureNode(node: HTMLElement, background: string | null): Promise<Blob | null> {
   const { default: html2canvas } = await import("html2canvas");
   const canvas = await html2canvas(node, {
@@ -139,7 +184,10 @@ async function captureNode(node: HTMLElement, background: string | null): Promis
     // ancestro/descendiente del nodo a exportar, sin tocar la cascada real (los ancestros se
     // preservan intactos para que herencia/variables CSS sigan resolviendo bien).
     ignoreElements: (el) => !(node.contains(el) || el.contains(node)),
-    onclone: (_doc, clonedNode) => inlineComputedStyles(node, clonedNode),
+    onclone: (_doc, clonedNode) => {
+      inlineComputedStyles(node, clonedNode);
+      applyExportOnlyFixups(clonedNode);
+    },
   });
   return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/png"));
 }
