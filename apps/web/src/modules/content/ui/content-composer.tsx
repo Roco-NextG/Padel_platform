@@ -150,11 +150,14 @@ function inlineComputedStyles(source: Element, target: Element) {
  * sticker aislado abrevia los nombres aparte (abbreviateTeamLabel en
  * gen-slide.tsx) así que ahí casi nunca se llega a ese límite.
  *
- * `[data-cc-digit-nudge]`: valor en px (string, puede ser negativo) medido
- * pixel a pixel contra el PNG real — html2canvas rasteriza el número dentro
- * del círculo sistemáticamente más abajo del centro de su caja. Si cambia el
- * font-size de esos dígitos hay que volver a medir contra una descarga real,
- * no alcanza con mirar la pantalla (ver ScoreRow en gen-slide.tsx).
+ * `[data-cc-text-nudge]`: valor en px (string, puede ser negativo) medido
+ * pixel a pixel contra el PNG real — html2canvas rasteriza texto corto y
+ * centrado (el número dentro del círculo del marcador, la palabra del badge
+ * "GANADOR") sistemáticamente más abajo del centro real de su caja, sin
+ * importar si esa caja centra por flexbox o por padding simétrico. Si cambia
+ * el font-size de alguno de estos textos hay que volver a medir contra una
+ * descarga real, no alcanza con mirar la pantalla (ver ScoreRow y el badge
+ * de estilo "winner" en gen-slide.tsx).
  */
 function applyExportOnlyFixups(clonedRoot: Element) {
   clonedRoot.querySelectorAll<HTMLElement>("[data-cc-label-fix]").forEach((el) => {
@@ -163,8 +166,8 @@ function applyExportOnlyFixups(clonedRoot: Element) {
     const fontSize = parseFloat(el.style.fontSize) || 16;
     el.style.lineHeight = `${fontSize}px`;
   });
-  clonedRoot.querySelectorAll<HTMLElement>("[data-cc-digit-nudge]").forEach((el) => {
-    const dy = el.getAttribute("data-cc-digit-nudge");
+  clonedRoot.querySelectorAll<HTMLElement>("[data-cc-text-nudge]").forEach((el) => {
+    const dy = el.getAttribute("data-cc-text-nudge");
     if (dy) el.style.transform = `translateY(${dy}px)`;
   });
 }

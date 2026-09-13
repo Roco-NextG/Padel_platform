@@ -78,7 +78,7 @@ export function ResultSticker({
           className="rounded-full px-5 py-1.5 text-[22px] font-semibold tracking-wide text-black"
           style={{ backgroundColor: ACCENT_GREEN }}
         >
-          GANADOR
+          <span data-cc-text-nudge={BADGE_NUDGE}>GANADOR</span>
         </span>
         <span data-cc-label-fix="" className="max-w-full truncate text-[44px] font-bold leading-tight">
           {winnerLabel}
@@ -123,7 +123,7 @@ const ACCENT_GREEN = "#c8ef5a";
  * Caja de 36x36 para un solo dígito, centrado por flexbox — esto SIEMPRE se
  * vio bien en el navegador. El desfasaje real está solo del lado de
  * html2canvas al rasterizar (confirmado midiendo el PNG real), así que la
- * corrección vive en `data-cc-digit-nudge` (ver más abajo) y se aplica ÚNICA
+ * corrección vive en `data-cc-text-nudge` (ver más abajo) y se aplica ÚNICA
  * Y EXCLUSIVAMENTE sobre el clon que arma html2canvas para exportar
  * (content-composer.tsx, captureNode/applyExportOnlyFixups) — nunca sobre
  * este árbol en vivo. Un intento anterior aplicó el mismo translateY acá
@@ -141,6 +141,8 @@ const DIGIT_CENTER_BOX: CSSProperties = {
 /** Valor medido pixel a pixel contra el PNG exportado real — ver applyExportOnlyFixups. */
 const DIGIT_NUDGE_18 = "-8";
 const DIGIT_NUDGE_22 = "-14";
+/** Ídem, para el texto del badge "GANADOR" (22px, dentro de una píldora con padding). */
+const BADGE_NUDGE = "-10";
 
 /**
  * Fila de marcador estilo "cobertura deportiva" (pedido explícito: replicar
@@ -170,11 +172,11 @@ function ScoreRow({ label, scores, win }: { label: string; scores: number[]; win
               className="shrink-0 text-[18px] font-extrabold leading-none text-black"
               style={{ ...DIGIT_CENTER_BOX, backgroundColor: ACCENT_GREEN, borderRadius: 9999 }}
             >
-              <span data-cc-digit-nudge={DIGIT_NUDGE_18}>{s}</span>
+              <span data-cc-text-nudge={DIGIT_NUDGE_18}>{s}</span>
             </span>
           ) : (
             <span key={i} className="shrink-0 text-[22px] font-semibold leading-none text-white" style={DIGIT_CENTER_BOX}>
-              <span data-cc-digit-nudge={DIGIT_NUDGE_22}>{s}</span>
+              <span data-cc-text-nudge={DIGIT_NUDGE_22}>{s}</span>
             </span>
           )
         )}
