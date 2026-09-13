@@ -19,7 +19,7 @@ function StickerWatermark({ compact, centered }: { compact?: boolean; centered?:
   return (
     <span
       className={cn(
-        "font-medium tracking-widest text-white/45",
+        "whitespace-nowrap font-medium tracking-widest text-white/45",
         centered ? "self-center" : "self-end",
         compact ? "text-[10px]" : "text-[11px]"
       )}
@@ -80,7 +80,7 @@ export function ResultSticker({
         >
           GANADOR
         </span>
-        <span className="max-w-full text-[44px] font-bold leading-normal" style={ELLIPSIS_NO_VCLIP}>
+        <span data-cc-label-fix="" className="max-w-full truncate text-[44px] font-bold leading-tight">
           {winnerLabel}
         </span>
         <span className="text-[24px] font-medium opacity-80">{scoreLine}</span>
@@ -120,11 +120,15 @@ export function ResultSticker({
 const ACCENT_GREEN = "#c8ef5a";
 
 /**
- * Caja de 36x36 para un solo dígito — SOLO tamaño/centrado horizontal y de
- * fondo (círculo o no). No lleva ningún ajuste vertical: eso vive aparte en
- * `DIGIT_NUDGE`, sobre un span interno propio, porque aplicar el ajuste acá
- * mueve el círculo entero (fondo incluido) en vez de mover el dígito DENTRO
- * del círculo — confirmado con el PNG real cuando probé exactamente eso.
+ * Caja de 36x36 para un solo dígito, centrado por flexbox — esto SIEMPRE se
+ * vio bien en el navegador. El desfasaje real está solo del lado de
+ * html2canvas al rasterizar (confirmado midiendo el PNG real), así que la
+ * corrección vive en `data-cc-digit-nudge` (ver más abajo) y se aplica ÚNICA
+ * Y EXCLUSIVAMENTE sobre el clon que arma html2canvas para exportar
+ * (content-composer.tsx, captureNode/applyExportOnlyFixups) — nunca sobre
+ * este árbol en vivo. Un intento anterior aplicó el mismo translateY acá
+ * directamente y terminó rompiendo el visualizador (que nunca tuvo el bug)
+ * en vez de arreglar solo la exportación.
  */
 const DIGIT_CENTER_BOX: CSSProperties = {
   display: "flex",
@@ -134,43 +138,9 @@ const DIGIT_CENTER_BOX: CSSProperties = {
   justifyContent: "center",
 };
 
-/**
- * Empuja el dígito hacia arriba DENTRO de su caja ya centrada. Medido pixel
- * a pixel sobre el PNG real exportado (en el visualizador del navegador
- * siempre se ve centrado, ahí no se nota nada): html2canvas rasteriza este
- * texto más abajo del centro real de la caja, sin importar si esa caja
- * centra por flexbox o por line-height — mismo desfasaje con los dos
- * mecanismos, así que no es un problema de CSS sino de cómo html2canvas
- * ubica el baseline del texto al rasterizar. El desfasaje crece con el
- * font-size (18px necesitó -8px, 22px necesitó -14px — no es la misma
- * proporción, así que hay un valor por tamaño, no una sola constante).
- * Valores medidos, no estéticos: si cambia el font-size de estos dígitos hay
- * que volver a medir contra un PNG descargado de verdad, no alcanza con
- * mirar la pantalla.
- */
-const DIGIT_NUDGE_18: CSSProperties = { display: "inline-block", transform: "translateY(-8px)" };
-const DIGIT_NUDGE_22: CSSProperties = { display: "inline-block", transform: "translateY(-14px)" };
-
-/**
- * Reemplaza a mano la clase `truncate` de Tailwind (`overflow:hidden;
- * text-overflow:ellipsis; white-space:nowrap`) para un nombre de equipo
- * largo, que necesita abreviarse con "…" en ANCHO pero no debe recortarse en
- * ALTO. `overflow:hidden` de `truncate` clipea ambos ejes, y confirmado
- * descargando el PNG real (no alcanza con ver el visualizador: ahí siempre
- * se veía bien) — html2canvas pinta este texto extrabold un poco más alto de
- * lo que él mismo calculó para la caja de línea, y con overflow:hidden en el
- * mismo span eso se traduce en la parte de arriba de cada letra recortada.
- * Subir el line-height (`leading-normal`) no alcanzó para eliminarlo del
- * todo. `overflow-y: visible` dejar pasar ese margen de más sin afectar el
- * recorte horizontal, que sigue haciendo `overflow-x: hidden` +
- * `text-overflow: ellipsis`.
- */
-const ELLIPSIS_NO_VCLIP: CSSProperties = {
-  overflowX: "hidden",
-  overflowY: "visible",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-};
+/** Valor medido pixel a pixel contra el PNG exportado real — ver applyExportOnlyFixups. */
+const DIGIT_NUDGE_18 = "-8";
+const DIGIT_NUDGE_22 = "-14";
 
 /**
  * Fila de marcador estilo "cobertura deportiva" (pedido explícito: replicar
@@ -186,8 +156,9 @@ function ScoreRow({ label, scores, win }: { label: string; scores: number[]; win
   return (
     <div className="flex items-center justify-between gap-4">
       <span
-        className="min-w-0 text-[26px] font-extrabold leading-normal tracking-tight"
-        style={{ color: win ? ACCENT_GREEN : "#ffffff", ...ELLIPSIS_NO_VCLIP }}
+        data-cc-label-fix=""
+        className="min-w-0 truncate text-[26px] font-extrabold leading-tight tracking-tight"
+        style={{ color: win ? ACCENT_GREEN : "#ffffff" }}
       >
         {label.toUpperCase()}
       </span>
@@ -196,14 +167,14 @@ function ScoreRow({ label, scores, win }: { label: string; scores: number[]; win
           win ? (
             <span
               key={i}
-              className="shrink-0 text-[18px] font-extrabold text-black"
+              className="shrink-0 text-[18px] font-extrabold leading-none text-black"
               style={{ ...DIGIT_CENTER_BOX, backgroundColor: ACCENT_GREEN, borderRadius: 9999 }}
             >
-              <span style={DIGIT_NUDGE_18}>{s}</span>
+              <span data-cc-digit-nudge={DIGIT_NUDGE_18}>{s}</span>
             </span>
           ) : (
-            <span key={i} className="shrink-0 text-[22px] font-semibold text-white" style={DIGIT_CENTER_BOX}>
-              <span style={DIGIT_NUDGE_22}>{s}</span>
+            <span key={i} className="shrink-0 text-[22px] font-semibold leading-none text-white" style={DIGIT_CENTER_BOX}>
+              <span data-cc-digit-nudge={DIGIT_NUDGE_22}>{s}</span>
             </span>
           )
         )}
@@ -217,8 +188,9 @@ function Row({ label, score, win, compact }: { label: string; score: string; win
   return (
     <div className="flex items-center justify-between gap-4">
       <span
-        className={`min-w-0 leading-normal ${compact ? "text-[22px]" : "text-[28px]"} font-medium ${win ? "font-bold" : "text-white/70"}`}
-        style={{ ...winStyle, ...ELLIPSIS_NO_VCLIP }}
+        data-cc-label-fix=""
+        className={`min-w-0 truncate ${compact ? "text-[22px]" : "text-[28px]"} font-medium ${win ? "font-bold" : "text-white/70"}`}
+        style={winStyle}
       >
         {label}
       </span>
@@ -270,7 +242,7 @@ function SummarySticker({ item }: { item: Extract<ContentItem, { type: "summary"
       <div className="flex flex-col gap-2.5">
         {item.results.slice(0, 6).map((r, i) => (
           <div key={i} className="flex items-center justify-between gap-3 border-b border-white/15 pb-2 text-[18px] last:border-0">
-            <span className="leading-normal" style={ELLIPSIS_NO_VCLIP}>
+            <span data-cc-label-fix="" className="truncate">
               {r.teamA} <span className="opacity-50">vs</span> {r.teamB}
             </span>
             <span className="shrink-0 font-semibold tabular-nums">{r.score}</span>
@@ -381,7 +353,7 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
           está habilitado, ya lo trae él mismo (StickerWatermark, dentro de su propia
           tarjeta); acá solo se muestra cuando no hay marcador para no duplicarlo. */}
       {!(item.type === "result" && showScore) && (
-        <div className="absolute bottom-2 right-4 text-[11px] font-medium tracking-widest opacity-50">PADEL PLATFORM</div>
+        <div className="absolute bottom-2 right-4 whitespace-nowrap text-[11px] font-medium tracking-widest opacity-50">PADEL PLATFORM</div>
       )}
     </div>
   );
