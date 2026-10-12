@@ -5,31 +5,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div
-        className="relative hidden flex-col justify-between overflow-hidden p-10 lg:flex"
-        style={{ backgroundColor: "#121110", color: "#f5f4f2" }}
-      >
-        <div
-          className="absolute inset-0 opacity-90"
-          style={{
-            background:
-              "radial-gradient(circle at 15% 20%, var(--color-accent) 0%, transparent 45%), radial-gradient(circle at 85% 85%, var(--color-accent) 0%, transparent 40%)",
-          }}
-        />
-        <div className="relative text-white/80">
-          <DeuceUpWordmark className="h-4 w-auto" />
-        </div>
-        <div className="relative flex flex-col gap-3">
-          <p className="font-display text-6xl leading-[0.95] font-semibold tracking-tight">
-            Datos. Red.
-            <br />
-            Rating.
-          </p>
-          <p className="max-w-sm text-base text-white/70">
-            Organiza torneos de principio a fin y cada partido confirmado actualiza el rating de
-            cada jugador.
-          </p>
-        </div>
-      </div>
+        className="relative hidden overflow-hidden lg:block"
+        style={{
+          backgroundImage: "url(/brand/login-poster.jpg)",
+          backgroundSize: "cover",
+          backgroundPosition: "top center",
+        }}
+      />
 
       <div className="flex flex-col justify-between p-6 sm:p-10">
         <div className="flex items-center justify-between">
