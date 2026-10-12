@@ -2,40 +2,65 @@ import { useId, type SVGProps } from "react";
 
 /**
  * Wordmark "deuceUp" vectorizado a partir del logo que mandó el usuario —
- * ese PNG nunca llegó a disco (se adjuntó inline en el chat), así que en vez
- * de un auto-trace de píxeles se reconstruyó como vector real: contornos de
- * glyph reales (Anton, vía opentype.js) + un skewX(-12) para la inclinación
- * itálica + dos clip-paths a mano que replican el corte diagonal
- * característico del original (la punta de la "d" y el descendente de la
- * "p"). `fill="currentColor"` a propósito — es la MARCA, no texto suelto:
- * quien la usa controla el color por CSS (blanco en sidebar oscuro, negro si
- * hiciera falta sobre fondo claro), nunca queda un color pisado adentro del
- * SVG.
+ * ese PNG nunca llegó a disco (se adjuntó inline en el chat dos veces), así
+ * que en vez de un auto-trace de píxeles se reconstruyó como vector real:
+ * contornos de glyph reales (Anton, vía opentype.js) + un skewX(-12) para la
+ * inclinación itálica + tres recortes a mano que replican los cortes
+ * diagonales característicos del original. `fill="currentColor"` a
+ * propósito — es la MARCA, no texto suelto: quien la usa controla el color
+ * por CSS (blanco en sidebar oscuro, negro si hiciera falta sobre fondo
+ * claro), nunca queda un color pisado adentro del SVG.
  *
- * La profundidad del corte (0.16 de la altura del glyph) se ajustó a ojo
- * contra el PNG real: la primera versión (0.30) cortaba a lo ancho de TODO
- * el glyph (bowl incluido, no solo el asta/descendente), así que en vez de
- * un corte limpio quedaba una púa larga y puntiaguda — nada que ver con el
- * original. 0.16 es el punto donde el corte se nota pero no desfigura la
- * letra. Si se retoca, compararlo contra un render real, no alcanza con
- * mirar el código.
+ * Los tres cortes (confirmados contra el logo real, no a ojo desde una
+ * descripción):
+ * - "d": el asta termina en punta hacia arriba-izquierda — se le saca un
+ *   triángulo de la esquina superior DERECHA del asta (el lado izquierdo
+ *   queda largo/puntiagudo, el derecho corto).
+ * - "U": el trazo IZQUIERDO (no el derecho) tiene la misma punta que la
+ *   "d" — un detalle que se pasó por alto en el primer intento y rompía el
+ *   parecido con el original.
+ * - "p": el descendente termina en punta hacia abajo-derecha — se le saca
+ *   un triángulo de la esquina inferior IZQUIERDA (simétrico a la "d").
+ *
+ * Cada corte se implementa como un <path fill-rule="evenodd"> con el
+ * rectángulo completo del glyph MÁS el triángulo a remover superpuesto —
+ * evenodd cancela la zona de solapamiento, dejando un rectángulo con una
+ * mordida triangular. Intentos previos clipeaban SOLO la región del asta
+ * (sin el rectángulo completo alrededor), lo que borraba el glyph entero
+ * fuera de esa región — y por separado, con una profundidad de corte mal
+ * calibrada (30% del alto de TODO el glyph, bowl incluido) terminaba en una
+ * púa larga en vez de una punta limpia. Si se retoca, comparar contra el
+ * logo real descargado, no alcanza con mirar el código.
  */
 export function DeuceUpWordmark(props: SVGProps<SVGSVGElement>) {
   // IDs únicos por instancia: el layout de auth renderiza este wordmark dos
   // veces a la vez (versión desktop + versión mobile, una oculta por CSS
-  // responsive pero igual presente en el DOM) — con un id fijo, el segundo
-  // <clipPath> quedaría duplicado.
+  // responsive pero igual presente en el DOM) — con un id fijo, los
+  // <clipPath> quedarían duplicados.
   const id = useId();
   const cutD = `${id}-cut-d`;
+  const cutU = `${id}-cut-u`;
   const cutP = `${id}-cut-p`;
   return (
     <svg viewBox="-30 -919 3498 1101" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DeuceUp" {...props}>
       <defs>
         <clipPath id={cutD}>
-          <polygon points="10.2734375,-720.625 485.8203125,-879.375 485.8203125,27.8125 10.2734375,27.8125" />
+          <path
+            fillRule="evenodd"
+            d="M10.2734375,-879.375 L485.8203125,-879.375 L485.8203125,27.8125 L10.2734375,27.8125 Z M287,-879.375 L485.8203125,-879.375 L485.8203125,-749.375 Z"
+          />
+        </clipPath>
+        <clipPath id={cutU}>
+          <path
+            fillRule="evenodd"
+            d="M2472.67578125,-879.375 L2930.64453125,-879.375 L2930.64453125,27.8125 L2472.67578125,27.8125 Z M2492.68,-879.375 L2678.68,-879.375 L2678.68,-749.375 Z"
+          />
         </clipPath>
         <clipPath id={cutP}>
-          <polygon points="2953.6328125,-760.234375 3428.69140625,-760.234375 3428.69140625,-15.8984375 2953.6328125,142.0703125" />
+          <path
+            fillRule="evenodd"
+            d="M2953.6328125,-760.234375 L3428.69140625,-760.234375 L3428.69140625,142.0703125 L2953.6328125,142.0703125 Z M2953.6328125,142.0703125 L2953.6328125,52.0703125 L3151,142.0703125 Z"
+          />
         </clipPath>
       </defs>
       <g transform="skewX(-12)" fill="currentColor">
@@ -47,7 +72,10 @@ export function DeuceUpWordmark(props: SVGProps<SVGSVGElement>) {
         <path d="M1162.60 7.81L1162.60 7.81Q1104.00 7.81 1073.00-16.60Q1041.99-41.02 1030.76-84.72Q1019.53-128.42 1019.53-187.01L1019.53-187.01L1019.53-732.42L1195.31-732.42L1195.31-207.52Q1195.31-163.57 1202.15-146.24Q1208.98-128.91 1234.38-128.91L1234.38-128.91Q1261.72-128.91 1268.80-153.32Q1275.88-177.73 1275.88-216.31L1275.88-216.31L1275.88-732.42L1450.20-732.42L1450.20 0L1275.39 0L1275.39-78.13Q1258.79-36.13 1235.60-14.16Q1212.40 7.81 1162.60 7.81Z" />
         <path d="M1740.72 7.81L1740.72 7.81Q1617.68 7.81 1566.16-55.18Q1514.65-118.16 1514.65-240.23L1514.65-240.23L1514.65-465.82Q1514.65-557.62 1534.18-618.65Q1553.71-679.69 1602.54-709.96Q1651.37-740.23 1738.28-740.23L1738.28-740.23Q1798.83-740.23 1846.92-718.75Q1895.02-697.27 1922.85-655.76Q1950.68-614.26 1950.68-554.20L1950.68-554.20L1950.68-442.38L1772.46-442.38L1772.46-544.92Q1772.46-570.31 1765.14-587.65Q1757.81-604.98 1733.40-604.98L1733.40-604.98Q1690.43-604.98 1690.43-543.95L1690.43-543.95L1690.43-188.96Q1690.43-166.50 1700.20-147.71Q1709.96-128.91 1732.42-128.91L1732.42-128.91Q1755.37-128.91 1764.40-147.22Q1773.44-165.53 1773.44-189.94L1773.44-189.94L1773.44-312.99L1950.68-312.99L1950.68-185.06Q1950.68-124.51 1923.58-81.30Q1896.48-38.09 1849.12-15.14Q1801.76 7.81 1740.72 7.81Z" />
         <path d="M2216.80 7.81L2216.80 7.81Q2138.67 7.81 2092.29-21.48Q2045.90-50.78 2025.88-105.96Q2005.86-161.13 2005.86-238.77L2005.86-238.77L2005.86-533.20Q2005.86-635.25 2064.45-687.74Q2123.05-740.23 2225.59-740.23L2225.59-740.23Q2436.52-740.23 2436.52-533.20L2436.52-533.20L2436.52-479.98Q2436.52-383.30 2434.57-350.10L2434.57-350.10L2180.66-350.10L2180.66-208.50Q2180.66-188.96 2183.11-170.17Q2185.55-151.37 2194.09-139.16Q2202.64-126.95 2221.68-126.95L2221.68-126.95Q2249.02-126.95 2255.86-150.63Q2262.70-174.32 2262.70-212.40L2262.70-212.40L2262.70-282.71L2436.52-282.71L2436.52-241.21Q2436.52-159.18 2416.26-103.76Q2396.00-48.34 2347.90-20.26Q2299.80 7.81 2216.80 7.81ZM2179.69-535.64L2179.69-437.01L2262.70-437.01L2262.70-535.64Q2262.70-575.20 2252.93-592.53Q2243.16-609.86 2223.63-609.86L2223.63-609.86Q2202.64-609.86 2191.16-593.26Q2179.69-576.66 2179.69-535.64L2179.69-535.64Z" />
-        <path d="M2701.66 7.81L2701.66 7.81Q2594.24 7.81 2543.46-52.49Q2492.68-112.79 2492.68-229.98L2492.68-229.98L2492.68-859.38L2659.67-859.38L2659.67-236.82Q2659.67-215.33 2662.11-195.56Q2664.55-175.78 2673.34-163.09Q2682.13-150.39 2701.66-150.39L2701.66-150.39Q2721.68-150.39 2730.47-162.84Q2739.26-175.29 2741.46-195.31Q2743.65-215.33 2743.65-236.82L2743.65-236.82L2743.65-859.38L2910.64-859.38L2910.64-229.98Q2910.64-112.79 2859.86-52.49Q2809.08 7.81 2701.66 7.81Z" />
+        <path
+          clipPath={`url(#${cutU})`}
+          d="M2701.66 7.81L2701.66 7.81Q2594.24 7.81 2543.46-52.49Q2492.68-112.79 2492.68-229.98L2492.68-229.98L2492.68-859.38L2659.67-859.38L2659.67-236.82Q2659.67-215.33 2662.11-195.56Q2664.55-175.78 2673.34-163.09Q2682.13-150.39 2701.66-150.39L2701.66-150.39Q2721.68-150.39 2730.47-162.84Q2739.26-175.29 2741.46-195.31Q2743.65-215.33 2743.65-236.82L2743.65-236.82L2743.65-859.38L2910.64-859.38L2910.64-229.98Q2910.64-112.79 2859.86-52.49Q2809.08 7.81 2701.66 7.81Z"
+        />
         <path
           clipPath={`url(#${cutP})`}
           d="M3151.37 122.07L2973.63 122.07L2973.63-732.42L3151.37-732.42L3151.37-654.30Q3167.48-694.82 3196.04-717.53Q3224.61-740.23 3277.83-740.23L3277.83-740.23Q3349.61-740.23 3379.15-687.99Q3408.69-635.74 3408.69-551.27L3408.69-551.27L3408.69-190.92Q3408.69-134.77 3392.82-89.60Q3376.95-44.43 3343.02-18.31Q3309.08 7.81 3254.39 7.81L3254.39 7.81Q3183.11 7.81 3151.37-78.13L3151.37-78.13L3151.37 122.07ZM3192.87-128.42L3192.87-128.42Q3220.21-128.42 3225.83-155.76Q3231.45-183.11 3231.45-223.14L3231.45-223.14L3231.45-509.28Q3231.45-549.80 3225.83-576.90Q3220.21-604.00 3192.87-604.00L3192.87-604.00Q3164.55-604.00 3157.96-576.42Q3151.37-548.83 3151.37-509.28L3151.37-509.28L3151.37-223.14Q3151.37-183.59 3157.96-156.01Q3164.55-128.42 3192.87-128.42Z"
