@@ -1,5 +1,6 @@
 import { forwardRef, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
+import { DeuceUpWordmark } from "@/components/brand/deuceup-wordmark";
 import type { BackgroundStyle, ContentItem, FormatDef, ScoreStickerStyle } from "../domain/content";
 
 const BG_PRESETS: Record<Exclude<BackgroundStyle, "upload">, string> = {
@@ -298,6 +299,15 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
     >
       <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/20 to-black/60" />
 
+      {/* Marca de agua grande centrada — pedido explícito ("coloques el logo en el
+          contenido en el centro de la imagen"). Opacidad baja y detrás del resto
+          del contenido (marcador, logos, fecha) para que nunca compita con esa
+          información; reemplaza el texto "DEUCEUP" que antes solo aparecía
+          abajo a la derecha cuando no había marcador. */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <DeuceUpWordmark className="h-auto w-[55%] text-white opacity-[0.1]" />
+      </div>
+
       <div className="absolute right-12 top-12 text-[18px] font-semibold opacity-85">{item.dateLabel}</div>
 
       <div className={cn("absolute inset-0 flex items-end p-12", isVerticalFormat && "pr-36")}>
@@ -357,12 +367,6 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
         </div>
       )}
 
-      {/* El nombre de la app debe aparecer UNA sola vez en el slide — si el marcador
-          está habilitado, ya lo trae él mismo (StickerWatermark, dentro de su propia
-          tarjeta); acá solo se muestra cuando no hay marcador para no duplicarlo. */}
-      {!(item.type === "result" && showScore) && (
-        <div className="absolute bottom-2 right-4 whitespace-nowrap text-[11px] font-medium tracking-widest opacity-50">DEUCEUP</div>
-      )}
     </div>
   );
 });
