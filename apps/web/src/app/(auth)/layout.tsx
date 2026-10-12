@@ -1,3 +1,4 @@
+import { DeuceUpWordmark } from "@/components/brand/deuceup-wordmark";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -14,8 +15,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               "radial-gradient(circle at 15% 20%, var(--color-accent) 0%, transparent 45%), radial-gradient(circle at 85% 85%, var(--color-accent) 0%, transparent 40%)",
           }}
         />
-        <div className="relative text-sm font-medium tracking-tight text-white/80">
-          DeuceUp
+        <div className="relative text-white/80">
+          <DeuceUpWordmark className="h-4 w-auto" />
         </div>
         <div className="relative flex flex-col gap-3">
           <p className="font-display text-6xl leading-[0.95] font-semibold tracking-tight">
@@ -32,8 +33,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
       <div className="flex flex-col justify-between p-6 sm:p-10">
         <div className="flex items-center justify-between">
-          <span className="font-display text-xl font-semibold tracking-tight lg:hidden">
-            DeuceUp
+          <span className="text-foreground lg:hidden">
+            <DeuceUpWordmark className="h-5 w-auto" />
           </span>
           <div className="lg:ml-auto">
             <ThemeToggle />
