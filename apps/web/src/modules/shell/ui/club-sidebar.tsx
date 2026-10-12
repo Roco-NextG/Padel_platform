@@ -13,6 +13,7 @@ import {
   CaretRight,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { DeuceUpWordmark } from "@/components/brand/deuceup-wordmark";
 
 interface NavItem {
   href: string;
@@ -65,6 +66,10 @@ export function ClubSidebar({
 
   return (
     <nav className="flex h-[calc(100vh-2.5rem)] w-64 shrink-0 flex-col gap-4 self-start rounded-xl border border-border bg-surface-secondary p-3.5">
+      <div className="px-1 pt-1 pb-2 text-foreground">
+        <DeuceUpWordmark className="h-8 w-auto" />
+      </div>
+
       <div className="flex items-center gap-2.5 border-b border-border px-1 pb-3.5">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-inverse text-[13px] font-semibold text-inverse-foreground">
           {initials(workspaceName)}

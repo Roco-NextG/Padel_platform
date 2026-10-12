@@ -1,5 +1,6 @@
 import { forwardRef, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
+import { DeuceUpWordmark } from "@/components/brand/deuceup-wordmark";
 import type { BackgroundStyle, ContentItem, FormatDef, ScoreStickerStyle } from "../domain/content";
 
 const BG_PRESETS: Record<Exclude<BackgroundStyle, "upload">, string> = {
@@ -12,20 +13,16 @@ const BG_PRESETS: Record<Exclude<BackgroundStyle, "upload">, string> = {
  * Marca de agua chica dentro de la tarjeta — a pedido explícito ("en el sticker
  * debes colocar el nombre de la aplicación en pequeño"), pero SIEMPRE dentro
  * del bloque con fondo sólido, nunca flotando sobre el área transparente:
- * texto blanco sobre nada es invisible en cuanto el sticker se pega sobre un
- * fondo claro (confirmado con el screenshot de WhatsApp del usuario).
+ * blanco translúcido sobre nada es invisible en cuanto el sticker se pega
+ * sobre un fondo claro (confirmado con el screenshot de WhatsApp del
+ * usuario). Es el logo vectorizado real, no el nombre en texto — pedido
+ * explícito ("no coloques la palabra deuceUp sino que coloques el logo").
  */
 function StickerWatermark({ compact, centered }: { compact?: boolean; centered?: boolean }) {
   return (
-    <span
-      className={cn(
-        "whitespace-nowrap font-medium tracking-widest text-white/45",
-        centered ? "self-center" : "self-end",
-        compact ? "text-[10px]" : "text-[11px]"
-      )}
-    >
-      DEUCEUP
-    </span>
+    <DeuceUpWordmark
+      className={cn("w-auto text-white/45", centered ? "self-center" : "self-end", compact ? "h-[11px]" : "h-3")}
+    />
   );
 }
 
@@ -357,11 +354,11 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
         </div>
       )}
 
-      {/* El nombre de la app debe aparecer UNA sola vez en el slide — si el marcador
-          está habilitado, ya lo trae él mismo (StickerWatermark, dentro de su propia
+      {/* El logo debe aparecer UNA sola vez en el slide — si el marcador está
+          habilitado, ya lo trae él mismo (StickerWatermark, dentro de su propia
           tarjeta); acá solo se muestra cuando no hay marcador para no duplicarlo. */}
       {!(item.type === "result" && showScore) && (
-        <div className="absolute bottom-2 right-4 whitespace-nowrap text-[11px] font-medium tracking-widest opacity-50">DEUCEUP</div>
+        <DeuceUpWordmark className="absolute bottom-2 right-4 h-3 w-auto text-white opacity-50" />
       )}
     </div>
   );
