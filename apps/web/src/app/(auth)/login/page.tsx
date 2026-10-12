@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LoginForm } from "@/modules/auth/ui/login-form";
 import { Alert } from "@/components/ui/alert";
 
-export const metadata: Metadata = { title: "Iniciar sesión — Padel Platform" };
+export const metadata: Metadata = { title: "Iniciar sesión — DeuceUp" };
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   invite_expired:
@@ -20,7 +20,7 @@ export default async function LoginPage({
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-1.5">
         <h1 className="text-2xl font-semibold tracking-tight">Inicia sesión</h1>
-        <p className="text-sm text-muted-foreground">Entra a tu cuenta de Padel Platform.</p>
+        <p className="text-sm text-muted-foreground">Entra a tu cuenta de DeuceUp.</p>
       </div>
       {authError && AUTH_ERROR_MESSAGES[authError] && <Alert tone="error">{AUTH_ERROR_MESSAGES[authError]}</Alert>}
       <LoginForm next={next} />

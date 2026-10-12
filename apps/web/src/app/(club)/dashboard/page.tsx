@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatZonedDate } from "@/lib/timezone";
 
-export const metadata: Metadata = { title: "Dashboard — Padel Platform" };
+export const metadata: Metadata = { title: "Dashboard — DeuceUp" };
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ pistaClub?: string }> }) {
   const { pistaClub } = await searchParams;

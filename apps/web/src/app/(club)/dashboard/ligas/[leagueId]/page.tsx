@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Trophy } from "@phosphor-icons/react/dist/ssr";
 
-export const metadata: Metadata = { title: "Liga — Padel Platform" };
+export const metadata: Metadata = { title: "Liga — DeuceUp" };
 
 export default async function LigaPage({ params }: { params: Promise<{ leagueId: string }> }) {
   const { leagueId } = await params;

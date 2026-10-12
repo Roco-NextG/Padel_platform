@@ -7,7 +7,7 @@ import { isAdmin, roleLabel } from "@/modules/auth/domain/roles";
 import { signOutAction } from "@/modules/auth/application/actions";
 import { Button } from "@/components/ui/button";
 
-export const metadata: Metadata = { title: "Bienvenida — Padel Platform" };
+export const metadata: Metadata = { title: "Bienvenida — DeuceUp" };
 
 export default async function BienvenidaPage() {
   const context = await getCurrentUserContext();

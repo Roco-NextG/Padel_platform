@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { CalendarBlank, Radio, CalendarDots } from "@phosphor-icons/react/dist/ssr";
 import { todayZonedDateKey } from "@/lib/timezone";
 
-export const metadata: Metadata = { title: "Partidos — Padel Platform" };
+export const metadata: Metadata = { title: "Partidos — DeuceUp" };
 
 export default async function PartidosPage({
   searchParams,

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { fetchPlayerDirectory, fetchRanking } from "@/modules/players/infrastructure/playerRepository";
 import { PlayersView } from "@/modules/players/ui/players-view";
 
-export const metadata: Metadata = { title: "Jugadores — Padel Platform" };
+export const metadata: Metadata = { title: "Jugadores — DeuceUp" };
 
 export default async function JugadoresPage() {
   const [ranking, directory] = await Promise.all([fetchRanking(), fetchPlayerDirectory()]);

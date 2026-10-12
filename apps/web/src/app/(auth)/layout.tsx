@@ -15,7 +15,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         <div className="relative text-sm font-medium tracking-tight text-white/80">
-          Padel Platform
+          DeuceUp
         </div>
         <div className="relative flex flex-col gap-3">
           <p className="font-display text-6xl leading-[0.95] font-semibold tracking-tight">
@@ -33,7 +33,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="flex flex-col justify-between p-6 sm:p-10">
         <div className="flex items-center justify-between">
           <span className="font-display text-xl font-semibold tracking-tight lg:hidden">
-            Padel Platform
+            DeuceUp
           </span>
           <div className="lg:ml-auto">
             <ThemeToggle />

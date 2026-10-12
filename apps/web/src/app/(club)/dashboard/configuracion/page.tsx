@@ -8,7 +8,7 @@ import { OrganizerClubEditor } from "@/modules/courts/ui/organizer-club-editor";
 import { ProfileForm } from "@/modules/shell/ui/profile-form";
 import { Card } from "@/components/ui/card";
 
-export const metadata: Metadata = { title: "Configuración — Padel Platform" };
+export const metadata: Metadata = { title: "Configuración — DeuceUp" };
 
 export default async function ConfiguracionPage() {
   const context = await getCurrentUserContext();

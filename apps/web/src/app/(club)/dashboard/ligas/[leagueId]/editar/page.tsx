@@ -13,7 +13,7 @@ import { categoryName } from "@/modules/tournaments/domain/category";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-export const metadata: Metadata = { title: "Editar liga — Padel Platform" };
+export const metadata: Metadata = { title: "Editar liga — DeuceUp" };
 
 export default async function EditarLigaPage({ params }: { params: Promise<{ leagueId: string }> }) {
   const { leagueId } = await params;
