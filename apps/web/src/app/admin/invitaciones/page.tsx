@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getPendingInvites } from "@/modules/admin/application/getAdminData";
 import { PendingInvitesList } from "@/modules/admin/ui/pending-invites-list";
 
-export const metadata: Metadata = { title: "Invitaciones — Admin — Padel Platform" };
+export const metadata: Metadata = { title: "Invitaciones — Admin — DeuceUp" };
 
 export default async function AdminInvitacionesPage() {
   const invites = await getPendingInvites();

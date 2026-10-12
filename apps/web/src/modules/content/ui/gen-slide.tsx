@@ -24,7 +24,7 @@ function StickerWatermark({ compact, centered }: { compact?: boolean; centered?:
         compact ? "text-[10px]" : "text-[11px]"
       )}
     >
-      PADEL PLATFORM
+      DEUCEUP
     </span>
   );
 }
@@ -361,7 +361,7 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
           está habilitado, ya lo trae él mismo (StickerWatermark, dentro de su propia
           tarjeta); acá solo se muestra cuando no hay marcador para no duplicarlo. */}
       {!(item.type === "result" && showScore) && (
-        <div className="absolute bottom-2 right-4 whitespace-nowrap text-[11px] font-medium tracking-widest opacity-50">PADEL PLATFORM</div>
+        <div className="absolute bottom-2 right-4 whitespace-nowrap text-[11px] font-medium tracking-widest opacity-50">DEUCEUP</div>
       )}
     </div>
   );

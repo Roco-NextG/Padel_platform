@@ -15,7 +15,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Trophy } from "@phosphor-icons/react/dist/ssr";
 
-export const metadata: Metadata = { title: "Cuadro — Padel Platform" };
+export const metadata: Metadata = { title: "Cuadro — DeuceUp" };
 
 export default async function CuadroPage({
   params,

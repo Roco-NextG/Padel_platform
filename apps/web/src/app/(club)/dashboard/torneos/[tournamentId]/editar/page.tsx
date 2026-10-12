@@ -16,7 +16,7 @@ import { categoryName } from "@/modules/tournaments/domain/category";
 import { WIZARD_STEP_LABELS } from "@/modules/tournaments/domain/tournament";
 import { Card } from "@/components/ui/card";
 
-export const metadata: Metadata = { title: "Editar torneo — Padel Platform" };
+export const metadata: Metadata = { title: "Editar torneo — DeuceUp" };
 
 export default async function EditarTorneoPage({ params }: { params: Promise<{ tournamentId: string }> }) {
   const { tournamentId } = await params;

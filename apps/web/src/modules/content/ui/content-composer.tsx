@@ -208,7 +208,7 @@ function slugify(text: string): string {
 /**
  * Nombre del torneo + nombre de la app + fecha + número de secuencia — a
  * pedido explícito, para poder identificar y ordenar los PNG descargados sin
- * tener que abrir cada uno (antes era solo "padel-platform-{formato}-{id}",
+ * tener que abrir cada uno (antes era solo "deuceup-{formato}-{id}",
  * ilegible apenas se descargaban dos o tres). La secuencia (`seq`) es un
  * contador por sesión del composer, no por día ni por torneo — arranca en 1
  * cada vez que se abre/recarga la página y sube con cada exportación
@@ -220,7 +220,7 @@ function buildExportFilename(tournamentName: string, seq: number): string {
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   const seqStr = String(seq).padStart(2, "0");
-  return `padel-platform-${slugify(tournamentName)}-${y}${m}${d}-${seqStr}`;
+  return `deuceup-${slugify(tournamentName)}-${y}${m}${d}-${seqStr}`;
 }
 
 /**
@@ -414,7 +414,7 @@ export function ContentComposer({ feed }: { feed: ContentFeedData }) {
     // Blob en sí puede seguir generándose async — ClipboardItem acepta una Promise<Blob> como
     // valor exactamente para este caso.
     // Captura stickerRef (ResultStickerCapture), NO slideRef: ese es el slide completo (fondo,
-    // logo, fecha, sponsors, watermark "Padel Platform") — un sticker pensado para pegarse sobre
+    // logo, fecha, sponsors, watermark "DeuceUp") — un sticker pensado para pegarse sobre
     // cualquier fondo no puede traer nada de eso, solo la franja/tarjeta/ganador en sí.
     const node = stickerRef.current;
     setIsExporting(true);

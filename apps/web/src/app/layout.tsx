@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Padel Platform",
+  title: "DeuceUp",
   description: "Torneos, ranking y red de jugadores de pádel.",
 };
 

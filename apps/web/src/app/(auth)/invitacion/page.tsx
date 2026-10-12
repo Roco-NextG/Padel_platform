@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { fetchAuthenticatedUser } from "@/modules/auth/infrastructure/authRepository";
 import { SetPasswordForm } from "@/modules/invites/ui/set-password-form";
 
-export const metadata: Metadata = { title: "Activar cuenta — Padel Platform" };
+export const metadata: Metadata = { title: "Activar cuenta — DeuceUp" };
 
 export default async function InvitacionPage() {
   const { user } = await fetchAuthenticatedUser();

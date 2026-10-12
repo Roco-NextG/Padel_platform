@@ -70,7 +70,7 @@ export function AdminSidebar() {
 
   return (
     <nav className="flex w-64 shrink-0 flex-col gap-0.5 border-r border-border bg-surface-secondary px-3 py-4">
-      <div className="px-2.5 pb-3 font-display text-base font-semibold tracking-tight">Padel Platform</div>
+      <div className="px-2.5 pb-3 font-display text-base font-semibold tracking-tight">DeuceUp</div>
       {TOP_ITEMS.map((item) => (
         <NavRow key={item.href} item={item} active={pathname === item.href} />
       ))}

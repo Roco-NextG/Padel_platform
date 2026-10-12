@@ -9,7 +9,7 @@ import { ContentComposer } from "@/modules/content/ui/content-composer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ImageSquare } from "@phosphor-icons/react/dist/ssr";
 
-export const metadata: Metadata = { title: "Contenido — Padel Platform" };
+export const metadata: Metadata = { title: "Contenido — DeuceUp" };
 
 export default async function ContenidoPage({
   searchParams,

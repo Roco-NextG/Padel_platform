@@ -7,7 +7,7 @@ import { CreateLeagueForm } from "@/modules/leagues/ui/create-league-form";
 import { EmptyState } from "@/components/ui/empty-state";
 import { UserCircleMinus } from "@phosphor-icons/react/dist/ssr";
 
-export const metadata: Metadata = { title: "Nueva liga — Padel Platform" };
+export const metadata: Metadata = { title: "Nueva liga — DeuceUp" };
 
 export default async function NuevaLigaPage() {
   const context = await getCurrentUserContext();

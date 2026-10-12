@@ -6,7 +6,7 @@ import { LeagueCard, NewLeagueCard } from "@/modules/leagues/ui/league-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Trophy } from "@phosphor-icons/react/dist/ssr";
 
-export const metadata: Metadata = { title: "Mis torneos — Padel Platform" };
+export const metadata: Metadata = { title: "Mis torneos — DeuceUp" };
 
 export default async function MisTorneosPage() {
   const [{ account, tournaments }, { leagues }] = await Promise.all([getMyTournaments(), getMyLeagues()]);

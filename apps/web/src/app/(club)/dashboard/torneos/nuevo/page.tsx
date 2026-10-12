@@ -7,7 +7,7 @@ import { CreateTournamentForm } from "@/modules/tournaments/ui/create-tournament
 import { EmptyState } from "@/components/ui/empty-state";
 import { UserCircleMinus } from "@phosphor-icons/react/dist/ssr";
 
-export const metadata: Metadata = { title: "Nuevo torneo — Padel Platform" };
+export const metadata: Metadata = { title: "Nuevo torneo — DeuceUp" };
 
 export default async function NuevoTorneoPage() {
   const context = await getCurrentUserContext();
