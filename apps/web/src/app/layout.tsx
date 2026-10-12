@@ -7,7 +7,10 @@ import "./globals.css";
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  // 700 hace falta: `font-bold` se usa en 9 archivos del panel y sin este peso
+  // cargado el navegador lo sintetiza (negrita falsa) en vez de usar el Inter
+  // Bold real.
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
