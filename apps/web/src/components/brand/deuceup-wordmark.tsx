@@ -11,6 +11,14 @@ import { useId, type SVGProps } from "react";
  * quien la usa controla el color por CSS (blanco en sidebar oscuro, negro si
  * hiciera falta sobre fondo claro), nunca queda un color pisado adentro del
  * SVG.
+ *
+ * La profundidad del corte (0.16 de la altura del glyph) se ajustó a ojo
+ * contra el PNG real: la primera versión (0.30) cortaba a lo ancho de TODO
+ * el glyph (bowl incluido, no solo el asta/descendente), así que en vez de
+ * un corte limpio quedaba una púa larga y puntiaguda — nada que ver con el
+ * original. 0.16 es el punto donde el corte se nota pero no desfigura la
+ * letra. Si se retoca, compararlo contra un render real, no alcanza con
+ * mirar el código.
  */
 export function DeuceUpWordmark(props: SVGProps<SVGSVGElement>) {
   // IDs únicos por instancia: el layout de auth renderiza este wordmark dos
@@ -24,10 +32,10 @@ export function DeuceUpWordmark(props: SVGProps<SVGSVGElement>) {
     <svg viewBox="-30 -919 3498 1101" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DeuceUp" {...props}>
       <defs>
         <clipPath id={cutD}>
-          <polygon points="10.2734375,-599.21875 485.8203125,-879.375 485.8203125,27.8125 10.2734375,27.8125" />
+          <polygon points="10.2734375,-720.625 485.8203125,-879.375 485.8203125,27.8125 10.2734375,27.8125" />
         </clipPath>
         <clipPath id={cutP}>
-          <polygon points="2953.6328125,-760.234375 3428.69140625,-760.234375 3428.69140625,-136.62109375 2953.6328125,142.0703125" />
+          <polygon points="2953.6328125,-760.234375 3428.69140625,-760.234375 3428.69140625,-15.8984375 2953.6328125,142.0703125" />
         </clipPath>
       </defs>
       <g transform="skewX(-12)" fill="currentColor">
