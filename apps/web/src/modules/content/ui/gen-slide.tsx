@@ -21,7 +21,7 @@ const BG_PRESETS: Record<Exclude<BackgroundStyle, "upload">, string> = {
 function StickerWatermark({ compact, centered }: { compact?: boolean; centered?: boolean }) {
   return (
     <DeuceUpWordmark
-      className={cn("w-auto text-white/45", centered ? "self-center" : "self-end", compact ? "h-[11px]" : "h-3")}
+      className={cn("w-auto text-white/45", centered ? "self-center" : "self-end", compact ? "h-5" : "h-6")}
     />
   );
 }
@@ -337,6 +337,15 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
         </div>
       )}
 
+      {/* Logo grande, legible, centrado abajo — mismo lugar que antes tenía el
+          watermark de esquina, pero más grande y centrado para que se note al
+          promocionar la app con las publicaciones. Solo cuando no hay marcador:
+          si lo hay, ya trae su propio watermark (StickerWatermark) y este de
+          acá quedaría pisándolo (ambos anclados abajo). */}
+      {!(item.type === "result" && showScore) && (
+        <DeuceUpWordmark className="absolute bottom-6 left-1/2 h-8 w-auto -translate-x-1/2 text-white opacity-80" />
+      )}
+
       {tiktokChrome && (
         <div className="absolute bottom-24 right-4 flex flex-col items-center gap-5 text-[14px] font-semibold">
           <span className="flex flex-col items-center gap-1">
@@ -354,12 +363,6 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
         </div>
       )}
 
-      {/* El logo debe aparecer UNA sola vez en el slide — si el marcador está
-          habilitado, ya lo trae él mismo (StickerWatermark, dentro de su propia
-          tarjeta); acá solo se muestra cuando no hay marcador para no duplicarlo. */}
-      {!(item.type === "result" && showScore) && (
-        <DeuceUpWordmark className="absolute bottom-2 right-4 h-3 w-auto text-white opacity-50" />
-      )}
     </div>
   );
 });
