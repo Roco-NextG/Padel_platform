@@ -230,6 +230,9 @@ function AnnounceSticker({ item }: { item: Extract<ContentItem, { type: "upcomin
         {item.teamA.label} <span className="opacity-60">vs</span> {item.teamB.label}
       </span>
       <span className="text-[18px] opacity-70">{item.category}</span>
+      <div className="mt-1 flex items-center justify-center">
+        <StickerWatermark centered />
+      </div>
     </div>
   );
 }
@@ -247,6 +250,9 @@ function SummarySticker({ item }: { item: Extract<ContentItem, { type: "summary"
             <span className="shrink-0 font-semibold tabular-nums">{r.score}</span>
           </div>
         ))}
+      </div>
+      <div className="mt-1 flex items-center justify-center">
+        <StickerWatermark centered />
       </div>
     </div>
   );
@@ -339,10 +345,12 @@ export const GenSlide = forwardRef<HTMLDivElement, GenSlideProps>(function GenSl
 
       {/* Logo grande, legible, centrado abajo — mismo lugar que antes tenía el
           watermark de esquina, pero más grande y centrado para que se note al
-          promocionar la app con las publicaciones. Solo cuando no hay marcador:
-          si lo hay, ya trae su propio watermark (StickerWatermark) y este de
-          acá quedaría pisándolo (ambos anclados abajo). */}
-      {!(item.type === "result" && showScore) && (
+          promocionar la app con las publicaciones. SOLO cuando no hay ninguna
+          tarjeta en pantalla (resultado con marcador oculto): "upcoming" y
+          "summary" siempre muestran su propia tarjeta, que ya trae su watermark
+          adentro (ver AnnounceSticker/SummarySticker) — este de acá quedaría
+          fuera de esa tarjeta, pisado contra el borde del slide. */}
+      {item.type === "result" && !showScore && (
         <DeuceUpWordmark className="absolute bottom-6 left-1/2 h-8 w-auto -translate-x-1/2 text-white opacity-80" />
       )}
 
