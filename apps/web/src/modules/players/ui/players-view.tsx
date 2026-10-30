@@ -13,6 +13,7 @@ import { Sparkline } from "./sparkline";
 import { PlayerForm } from "./player-form";
 import { createPlayerStandaloneAction, updatePlayerAction } from "../application/playerActions";
 import { confidenceFromRD, playerName, type PlayerRankingItem, type VisiblePlayer } from "../domain/player";
+import { calculateAge } from "@/lib/age";
 
 type Tab = "ranking" | "jugadores";
 
@@ -20,19 +21,47 @@ const CONFIDENCE_TONE = { Alta: "accent", Media: "neutral", Baja: "neutral" } as
 
 const GENDER_LABEL: Record<string, string> = { MALE: "Masculino", FEMALE: "Femenino", OTHER: "Otro" };
 
+/**
+ * Junior/Master acá son un filtro de búsqueda derivado de la fecha de
+ * nacimiento (pedido explícito: "buscar por categorías como junior o
+ * master") — no existe un campo guardado "es junior/master" en el jugador,
+ * a diferencia de category (1-7), que sí es un dato propio. La referencia
+ * de edad es HOY (no hay torneo de contexto en esta pantalla, a diferencia
+ * de la elegibilidad al inscribir — ver validateTeamAge).
+ */
+export type CategoryFilterValue = number | "JUNIOR" | "MASTER" | null;
+
+function playerAgeBracket(birthDate: string | null, today: string): "JUNIOR" | "MASTER" | null {
+  if (!birthDate) return null;
+  const age = calculateAge(birthDate, today);
+  if (age < 18) return "JUNIOR";
+  if (age >= 40) return "MASTER";
+  return null;
+}
+
+function playerMatchesCategory(p: VisiblePlayer, filter: CategoryFilterValue, today: string): boolean {
+  if (filter === null) return true;
+  if (filter === "JUNIOR" || filter === "MASTER") return playerAgeBracket(p.birthDate, today) === filter;
+  return p.category === filter;
+}
+
 function CategoryFilter({
   categories,
+  showJunior,
+  showMaster,
   active,
   onChange,
   layoutId,
 }: {
   categories: number[];
-  active: number | null;
-  onChange: (c: number | null) => void;
+  showJunior: boolean;
+  showMaster: boolean;
+  active: CategoryFilterValue;
+  onChange: (c: CategoryFilterValue) => void;
   layoutId: string;
 }) {
   return (
-    <div className="inline-flex gap-1 rounded-full border border-border bg-surface-secondary p-1">
+    <div className="inline-flex flex-wrap gap-1 rounded-full border border-border bg-surface-secondary p-1">
       <button
         type="button"
         onClick={() => onChange(null)}
@@ -62,6 +91,85 @@ function CategoryFilter({
           <span className="relative">Cat. {c}</span>
         </button>
       ))}
+      {showJunior && (
+        <button
+          type="button"
+          onClick={() => onChange("JUNIOR")}
+          className={cn(
+            "relative rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+            active === "JUNIOR" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {active === "JUNIOR" && (
+            <motion.span layoutId={layoutId} className="absolute inset-0 rounded-full bg-surface shadow-sm" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
+          )}
+          <span className="relative">Junior</span>
+        </button>
+      )}
+      {showMaster && (
+        <button
+          type="button"
+          onClick={() => onChange("MASTER")}
+          className={cn(
+            "relative rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+            active === "MASTER" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {active === "MASTER" && (
+            <motion.span layoutId={layoutId} className="absolute inset-0 rounded-full bg-surface shadow-sm" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
+          )}
+          <span className="relative">Master</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+const GENDER_FILTERS: { code: "MALE" | "FEMALE"; label: string }[] = [
+  { code: "MALE", label: "Masculino" },
+  { code: "FEMALE", label: "Femenino" },
+];
+
+function GenderFilter({
+  active,
+  onChange,
+  layoutId,
+}: {
+  active: "MALE" | "FEMALE" | null;
+  onChange: (g: "MALE" | "FEMALE" | null) => void;
+  layoutId: string;
+}) {
+  return (
+    <div className="inline-flex gap-1 rounded-full border border-border bg-surface-secondary p-1">
+      <button
+        type="button"
+        onClick={() => onChange(null)}
+        className={cn(
+          "relative rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+          active === null ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        {active === null && (
+          <motion.span layoutId={layoutId} className="absolute inset-0 rounded-full bg-surface shadow-sm" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
+        )}
+        <span className="relative">Todos</span>
+      </button>
+      {GENDER_FILTERS.map((g) => (
+        <button
+          key={g.code}
+          type="button"
+          onClick={() => onChange(g.code)}
+          className={cn(
+            "relative rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+            active === g.code ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {active === g.code && (
+            <motion.span layoutId={layoutId} className="absolute inset-0 rounded-full bg-surface shadow-sm" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
+          )}
+          <span className="relative">{g.label}</span>
+        </button>
+      ))}
     </div>
   );
 }
@@ -81,12 +189,16 @@ function TrendIndicator({ trend, delta }: { trend: PlayerRankingItem["trend"]; d
 const PODIUM_ORDER = ["order-2 sm:order-1", "order-1 sm:order-2", "order-3"];
 
 function RankingTab({ players }: { players: PlayerRankingItem[] }) {
-  const [category, setCategory] = useState<number | null>(null);
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [category, setCategory] = useState<CategoryFilterValue>(null);
+  const [gender, setGender] = useState<"MALE" | "FEMALE" | null>(null);
   const categories = useMemo(
     () => [...new Set(players.map((p) => p.category).filter((c): c is number => c !== null))].sort((a, b) => a - b),
     [players]
   );
-  const filtered = category === null ? players : players.filter((p) => p.category === category);
+  const showJunior = useMemo(() => players.some((p) => playerAgeBracket(p.birthDate, today) === "JUNIOR"), [players, today]);
+  const showMaster = useMemo(() => players.some((p) => playerAgeBracket(p.birthDate, today) === "MASTER"), [players, today]);
+  const filtered = players.filter((p) => playerMatchesCategory(p, category, today) && (gender === null || p.gender === gender));
   const podium = filtered.slice(0, 3);
   const rest = filtered.slice(3);
 
@@ -103,7 +215,17 @@ function RankingTab({ players }: { players: PlayerRankingItem[] }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <CategoryFilter categories={categories} active={category} onChange={setCategory} layoutId="rank-category-active" />
+        <div className="flex flex-wrap items-center gap-2">
+          <CategoryFilter
+            categories={categories}
+            showJunior={showJunior}
+            showMaster={showMaster}
+            active={category}
+            onChange={setCategory}
+            layoutId="rank-category-active"
+          />
+          <GenderFilter active={gender} onChange={setGender} layoutId="rank-gender-active" />
+        </div>
         <span className="text-xs text-muted-foreground">{filtered.length} {filtered.length === 1 ? "jugador" : "jugadores"}</span>
       </div>
 
@@ -230,17 +352,22 @@ function PlayerCard({ player, onUpdated }: { player: VisiblePlayer; onUpdated: (
 }
 
 function JugadoresTab({ players: initialPlayers }: { players: VisiblePlayer[] }) {
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [players, setPlayers] = useState(initialPlayers);
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<number | null>(null);
+  const [category, setCategory] = useState<CategoryFilterValue>(null);
+  const [gender, setGender] = useState<"MALE" | "FEMALE" | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const categories = useMemo(
     () => [...new Set(players.map((p) => p.category).filter((c): c is number => c !== null))].sort((a, b) => a - b),
     [players]
   );
+  const showJunior = useMemo(() => players.some((p) => playerAgeBracket(p.birthDate, today) === "JUNIOR"), [players, today]);
+  const showMaster = useMemo(() => players.some((p) => playerAgeBracket(p.birthDate, today) === "MASTER"), [players, today]);
 
   const filtered = players.filter((p) => {
-    if (category !== null && p.category !== category) return false;
+    if (!playerMatchesCategory(p, category, today)) return false;
+    if (gender !== null && p.gender !== gender) return false;
     if (query.trim() && !playerName(p).toLowerCase().includes(query.trim().toLowerCase())) return false;
     return true;
   });
@@ -256,7 +383,15 @@ function JugadoresTab({ players: initialPlayers }: { players: VisiblePlayer[] })
           <MagnifyingGlass className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar jugador..." className="pl-9" />
         </div>
-        <CategoryFilter categories={categories} active={category} onChange={setCategory} layoutId="jug-category-active" />
+        <CategoryFilter
+          categories={categories}
+          showJunior={showJunior}
+          showMaster={showMaster}
+          active={category}
+          onChange={setCategory}
+          layoutId="jug-category-active"
+        />
+        <GenderFilter active={gender} onChange={setGender} layoutId="jug-gender-active" />
         <span className="text-xs text-muted-foreground">{filtered.length} {filtered.length === 1 ? "jugador" : "jugadores"}</span>
         <Button type="button" size="sm" variant="secondary" onClick={() => setShowCreate((v) => !v)} className="ml-auto gap-1.5">
           <Plus className="size-4" />
