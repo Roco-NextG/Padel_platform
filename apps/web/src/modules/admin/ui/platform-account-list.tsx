@@ -129,11 +129,13 @@ function AccountRow({
   plans,
   showManagement,
   onUpdate,
+  onRemove,
 }: {
   account: PlatformAccount;
   plans: PlanRow[];
   showManagement: boolean;
   onUpdate: (patch: Partial<PlatformAccount>) => void;
+  onRemove: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -197,7 +199,8 @@ function AccountRow({
     setError(null);
     startTransition(async () => {
       const result = await deleteUserAction(account.accountType, account.entityId, account.userId);
-      setError(result.error);
+      if (result.error) setError(result.error);
+      else onRemove();
     });
   }
 
@@ -243,11 +246,9 @@ function AccountRow({
                   Hacer admin
                 </Button>
               )}
-              {account.accountType === "JUGADOR" && (
-                <Button type="button" variant="destructive" size="sm" loading={isPending} onClick={handleDelete}>
-                  Borrar
-                </Button>
-              )}
+              <Button type="button" variant="destructive" size="sm" loading={isPending} onClick={handleDelete}>
+                Borrar
+              </Button>
             </>
           )}
         </div>
@@ -325,6 +326,10 @@ export function PlatformAccountList({
     setAccounts((prev) => prev.map((a) => (a.entityId === entityId ? { ...a, ...patch } : a)));
   }
 
+  function handleAccountRemove(entityId: string) {
+    setAccounts((prev) => prev.filter((a) => a.entityId !== entityId));
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return accounts.filter((a) => {
@@ -375,6 +380,7 @@ export function PlatformAccountList({
               plans={plans}
               showManagement={showManagement}
               onUpdate={(patch) => handleAccountUpdate(a.entityId, patch)}
+              onRemove={() => handleAccountRemove(a.entityId)}
             />
           ))}
         </div>
