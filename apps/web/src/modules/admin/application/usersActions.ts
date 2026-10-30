@@ -7,6 +7,7 @@ import {
   changeAccountPlan,
   createAccountWithInvite,
   deleteAccount,
+  deleteAdmin,
   fetchAccountDetail,
   makeAdmin,
   revokeAdmin,
@@ -103,6 +104,23 @@ export async function revokeAdminAction(userId: string): Promise<SimpleActionSta
     await revokeAdmin(userId);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo revocar el rol de admin." };
+  }
+
+  revalidatePath("/admin/usuarios");
+  return { error: null };
+}
+
+export async function deleteAdminAction(userId: string): Promise<SimpleActionState> {
+  const auth = await requireAdmin();
+  if ("error" in auth) return { error: auth.error };
+  if (auth.userId === userId) {
+    return { error: "No podés borrar tu propia cuenta — pedile a otro admin que lo haga." };
+  }
+
+  try {
+    await deleteAdmin(userId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo borrar la cuenta." };
   }
 
   revalidatePath("/admin/usuarios");

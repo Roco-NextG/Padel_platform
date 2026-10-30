@@ -362,26 +362,43 @@ export async function makeAdmin(userId: string): Promise<void> {
  * role_assignments/account_activity — seguro gracias al fix de FK en
  * 0005_billing_schema.sql).
  *
- * Solo JUGADOR admite borrado real — clubs/organizers NO tienen policy de
- * delete a propósito (0003_rls.sql: "desactivar via is_active, nunca borrar
- * la fila"), porque son entidades con historial (canchas, torneos, rosters,
- * facturación) que no se pueden descartar sin dejar huérfanos. Antes esta
- * función igual lo intentaba: el delete de la fila fallaba en silencio por
- * RLS (0 filas afectadas, sin error), pero después borraba auth.users de
- * todos modos — dejaba la cuenta a medio borrar (entidad huérfana sin
- * usuario) y en la UI parecía que "no dejaba borrar" sin explicar por qué.
+ * clubs/organizers NO tienen policy de delete en RLS a propósito
+ * (0003_rls.sql: "desactivar via is_active, nunca borrar la fila"), así que
+ * para esos dos tipos el delete de la entidad se hace con el cliente de
+ * service-role (admin), no con el cliente de la request — si no, la fila
+ * sobrevive en silencio (0 filas afectadas, sin error) y el siguiente paso
+ * borra igual auth.users, dejando una entidad huérfana sin usuario. Esta
+ * función ya corre detrás de requireAdmin() (usersActions.ts), así que
+ * saltar RLS acá es seguro.
+ *
+ * tournaments/leagues referencian club_id/organizer_id con ON DELETE
+ * RESTRICT (0009/0026) — Postgres por sí solo ya evita dejar torneos/ligas
+ * huérfanos. Se chequea antes de intentar el delete para devolver un
+ * mensaje claro en vez del error crudo de Postgres.
  */
 export async function deleteAccount(accountType: PlatformAccountType, entityId: string, userId: string | null): Promise<void> {
-  if (accountType === "CLUB" || accountType === "ORGANIZADOR") {
-    throw new Error(
-      "Las cuentas de Club y Organizador no se pueden borrar — tienen historial asociado (canchas, torneos, facturación). Usa \"Desactivar\" en su lugar."
-    );
-  }
-
   const supabase = await createClient();
   const admin = createAdminClient();
 
-  const { error: entityError } = await supabase.from("players").delete().eq("id", entityId);
+  if (accountType === "CLUB" || accountType === "ORGANIZADOR") {
+    const column = accountType === "CLUB" ? "club_id" : "organizer_id";
+    const [{ count: tournamentCount }, { count: leagueCount }] = await Promise.all([
+      supabase.from("tournaments").select("id", { count: "exact", head: true }).eq(column, entityId),
+      supabase.from("leagues").select("id", { count: "exact", head: true }).eq(column, entityId),
+    ]);
+    const parts: string[] = [];
+    if (tournamentCount) parts.push(`${tournamentCount} torneo${tournamentCount === 1 ? "" : "s"}`);
+    if (leagueCount) parts.push(`${leagueCount} liga${leagueCount === 1 ? "" : "s"}`);
+    if (parts.length > 0) {
+      throw new Error(
+        `Esta cuenta tiene ${parts.join(" y ")} asociados y no se puede borrar mientras existan. Usa "Desactivar" en su lugar, o borra primero esos torneos/ligas.`
+      );
+    }
+  }
+
+  const table = accountType === "CLUB" ? "clubs" : accountType === "ORGANIZADOR" ? "organizers" : "players";
+  const client = accountType === "JUGADOR" ? supabase : admin;
+  const { error: entityError } = await client.from(table).delete().eq("id", entityId);
   if (entityError) throw new Error(entityError.message);
 
   if (userId) {
@@ -494,5 +511,18 @@ export async function fetchAdmins(): Promise<AdminAccount[]> {
 export async function revokeAdmin(userId: string): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("role_assignments").delete().eq("user_id", userId).eq("role", "ADMIN");
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * A diferencia de revokeAdmin (solo le quita el rol, el usuario sigue
+ * existiendo), esto borra la cuenta por completo: un admin no tiene fila de
+ * negocio propia (players/clubs/organizers), así que basta con borrar
+ * auth.users — cascada a role_assignments/account_activity, igual que en
+ * deleteAccount.
+ */
+export async function deleteAdmin(userId: string): Promise<void> {
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) throw new Error(error.message);
 }
