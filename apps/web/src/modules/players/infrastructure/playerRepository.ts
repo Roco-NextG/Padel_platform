@@ -2,7 +2,16 @@ import { createClient } from "@/lib/supabase/server";
 import type { GenderType } from "@/lib/supabase/database.types";
 import type { PlayerRankingItem, Trend, VisiblePlayer } from "../domain/player";
 
-function mapPlayerRow(p: { id: string; first_name: string; last_name: string; phone: string | null; email: string | null; category: number | null; gender: GenderType | null }): VisiblePlayer {
+function mapPlayerRow(p: {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string | null;
+  email: string | null;
+  category: number | null;
+  gender: GenderType | null;
+  birth_date: string | null;
+}): VisiblePlayer {
   return {
     id: p.id,
     firstName: p.first_name,
@@ -13,6 +22,7 @@ function mapPlayerRow(p: { id: string; first_name: string; last_name: string; ph
     ratingDeviation: null,
     category: p.category,
     gender: p.gender,
+    birthDate: p.birth_date,
   };
 }
 
@@ -31,6 +41,7 @@ async function fetchVisiblePlayers(): Promise<VisiblePlayer[]> {
     ratingDeviation: p.current_rating_deviation,
     category: p.category,
     gender: p.gender,
+    birthDate: p.birth_date,
   }));
 }
 
@@ -82,6 +93,7 @@ export interface PlayerInput {
   phone: string | null;
   category: number;
   gender: GenderType | null;
+  birthDate: string | null;
 }
 
 export async function fetchPlayerById(playerId: string): Promise<VisiblePlayer | null> {
@@ -100,6 +112,7 @@ export async function fetchPlayerById(playerId: string): Promise<VisiblePlayer |
     ratingDeviation: row.current_rating_deviation,
     category: row.category,
     gender: row.gender,
+    birthDate: row.birth_date,
   };
 }
 
@@ -112,6 +125,7 @@ export async function createPlayer(input: PlayerInput): Promise<VisiblePlayer> {
     p_phone: input.phone,
     p_category: input.category,
     p_gender: input.gender,
+    p_birth_date: input.birthDate,
   });
   if (error) throw new Error(error.message);
   return mapPlayerRow(data);
@@ -127,6 +141,7 @@ export async function updatePlayer(playerId: string, input: PlayerInput): Promis
     p_phone: input.phone,
     p_category: input.category,
     p_gender: input.gender,
+    p_birth_date: input.birthDate,
   });
   if (error) throw new Error(error.message);
   return mapPlayerRow(data);

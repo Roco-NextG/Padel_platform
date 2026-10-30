@@ -10,6 +10,7 @@ export interface VisiblePlayer {
   ratingDeviation: number | null;
   category: number | null;
   gender: GenderType | null;
+  birthDate: string | null;
 }
 
 export type Confidence = "Alta" | "Media" | "Baja";

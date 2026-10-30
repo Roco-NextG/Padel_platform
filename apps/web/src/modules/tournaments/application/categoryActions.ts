@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { addCategory, removeCategory } from "../infrastructure/tournamentRepository";
+import { addAgeCategory, addCategory, removeCategory } from "../infrastructure/tournamentRepository";
 import { requireTournamentManager } from "./authGuard";
+import type { AgeCategoryKey } from "../domain/category";
 
 export interface SimpleActionState {
   error: string | null;
@@ -30,6 +31,30 @@ export async function toggleCategoryAction(
       await removeCategory(existingCategoryId);
     } else {
       createdId = await addCategory(tournamentId, level, gender, usesGroupStage);
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo actualizar la categoría.", createdId: null };
+  }
+
+  revalidatePath(`/dashboard/torneos/${tournamentId}/editar`);
+  return { error: null, createdId };
+}
+
+export async function toggleAgeCategoryAction(
+  tournamentId: string,
+  existingCategoryId: string | null,
+  key: AgeCategoryKey,
+  usesGroupStage: boolean
+): Promise<ToggleCategoryState> {
+  const auth = await requireTournamentManager(tournamentId);
+  if (!auth.ok) return { error: auth.error, createdId: null };
+
+  let createdId: string | null = null;
+  try {
+    if (existingCategoryId) {
+      await removeCategory(existingCategoryId);
+    } else {
+      createdId = await addAgeCategory(tournamentId, key, usesGroupStage);
     }
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo actualizar la categoría.", createdId: null };

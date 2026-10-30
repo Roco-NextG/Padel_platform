@@ -5,12 +5,14 @@ import {
   assignPlayerCategory,
   createPlayerForEnrollment,
   createLeagueTeam,
+  fetchLeagueCategoryAgeRange,
   getPlayersByIds,
   removeTeam,
   searchPlayersForLeague,
 } from "../infrastructure/leagueEnrollmentRepository";
-import { validateTeamGender } from "@/modules/tournaments/domain/enrollment";
+import { validateTeamAge, validateTeamGender } from "@/modules/tournaments/domain/enrollment";
 import { requireLeagueManager } from "./leagueAuthGuard";
+import { getLeague } from "./getLeagues";
 import type { GenderType } from "@/lib/supabase/database.types";
 import type { PlayerSearchResult } from "@/modules/tournaments/domain/enrollment";
 
@@ -44,7 +46,8 @@ export async function createPlayerForLeagueAction(
   gender: GenderType,
   category: number,
   phone: string,
-  email: string
+  email: string,
+  birthDate: string | null = null
 ): Promise<CreatePlayerState> {
   const auth = await requireLeagueManager(leagueId);
   if (!auth.ok) return { error: auth.error, player: null };
@@ -53,9 +56,10 @@ export async function createPlayerForLeagueAction(
   if (!phone.trim()) return { error: "El teléfono es obligatorio.", player: null };
   if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) return { error: "El email no es válido.", player: null };
   if (category < 1 || category > 7) return { error: "La categoría debe estar entre 1 y 7.", player: null };
+  if (birthDate && Number.isNaN(Date.parse(birthDate))) return { error: "La fecha de nacimiento no es válida.", player: null };
 
   try {
-    const player = await createPlayerForEnrollment(firstName, lastName, gender, category, phone.trim(), email.trim());
+    const player = await createPlayerForEnrollment(firstName, lastName, gender, category, phone.trim(), email.trim(), birthDate);
     return { error: null, player };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo crear el jugador.", player: null };
@@ -87,7 +91,7 @@ export interface EnrollTeamState {
 export async function enrollLeagueTeamAction(
   leagueId: string,
   categoryId: string,
-  categoryGender: "MALE" | "FEMALE" | "MIXED",
+  categoryGender: "MALE" | "FEMALE" | "MIXED" | null,
   playerIds: [string, string]
 ): Promise<EnrollTeamState> {
   const auth = await requireLeagueManager(leagueId);
@@ -106,6 +110,19 @@ export async function enrollLeagueTeamAction(
       players.map((p) => p.gender)
     );
     if (genderError) return { error: genderError, teamId: null };
+
+    const { minAge, maxAge } = await fetchLeagueCategoryAgeRange(categoryId);
+    if (minAge !== null || maxAge !== null) {
+      const league = await getLeague(leagueId);
+      const referenceDate = league?.startDate ?? new Date().toISOString().slice(0, 10);
+      const ageError = validateTeamAge(
+        minAge,
+        maxAge,
+        players.map((p) => p.birthDate),
+        referenceDate
+      );
+      if (ageError) return { error: ageError, teamId: null };
+    }
 
     teamId = await createLeagueTeam(categoryId, playerIds);
   } catch (e) {

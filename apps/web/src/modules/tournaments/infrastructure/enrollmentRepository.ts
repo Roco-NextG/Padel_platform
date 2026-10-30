@@ -26,7 +26,8 @@ export async function createPlayerForEnrollment(
   gender: GenderType,
   category: number,
   phone: string | null,
-  email: string | null
+  email: string | null,
+  birthDate: string | null = null
 ): Promise<PlayerSearchResult> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("create_player_for_enrollment", {
@@ -36,6 +37,7 @@ export async function createPlayerForEnrollment(
     p_category: category,
     p_phone: phone,
     p_email: email,
+    p_birth_date: birthDate,
   });
   if (error) throw new Error(error.message);
 
@@ -49,11 +51,21 @@ export async function createPlayerForEnrollment(
   };
 }
 
-export async function getPlayersByIds(playerIds: string[]): Promise<{ playerId: string; gender: GenderType | null; category: number | null }[]> {
+export async function getPlayersByIds(
+  playerIds: string[]
+): Promise<{ playerId: string; gender: GenderType | null; category: number | null; birthDate: string | null }[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("get_players_by_ids", { p_player_ids: playerIds });
   if (error) throw new Error(error.message);
-  return (data ?? []).map((p) => ({ playerId: p.player_id, gender: p.gender, category: p.category }));
+  return (data ?? []).map((p) => ({ playerId: p.player_id, gender: p.gender, category: p.category, birthDate: p.birth_date }));
+}
+
+/** Rango de edad de la categoría (null/null = sin restricción) — para validateTeamAge en enrollTeamAction. */
+export async function fetchCategoryAgeRange(categoryId: string): Promise<{ minAge: number | null; maxAge: number | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("tournament_categories").select("min_age, max_age").eq("id", categoryId).single();
+  if (error) throw new Error(error.message);
+  return { minAge: data.min_age, maxAge: data.max_age };
 }
 
 export async function assignPlayerCategory(playerId: string, category: number): Promise<void> {

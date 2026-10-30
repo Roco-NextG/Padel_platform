@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { ListNumbers, CalendarBlank } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
-import { categoryName } from "@/modules/tournaments/domain/category";
+import { categoryDisplayName } from "@/modules/tournaments/domain/category";
 import { LeagueProgressCard } from "./league-progress-card";
 import { LeagueStandingsTable } from "./league-standings-table";
 import { GenerateLeagueScheduleButton } from "./generate-league-schedule-button";
@@ -75,7 +75,7 @@ export function LeagueScreen({ leagueId, categoriesData }: { leagueId: string; c
               {categoryIndex === i && (
                 <motion.span layoutId="league-cat-pill" className="absolute inset-0 rounded-full bg-foreground" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
               )}
-              <span className="relative z-10">{categoryName(Number(d.category.level), d.category.genderRestriction as "MALE" | "FEMALE" | "MIXED")}</span>
+              <span className="relative z-10">{categoryDisplayName(d.category)}</span>
             </button>
           ))}
         </div>

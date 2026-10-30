@@ -5,10 +5,20 @@ export interface LeagueCategory {
   leagueId: string;
   name: string;
   level: string;
-  genderRestriction: GenderType;
+  /** null solo en Junior (ver tournaments/domain/category.ts) — nunca en las categorías por nivel. */
+  genderRestriction: GenderType | null;
+  minAge: number | null;
+  maxAge: number | null;
 }
 
-// Nivel/género/nombre de categoría son un concepto genérico, no propio de
-// Torneo — se reutilizan CATEGORY_LEVELS/CATEGORY_GENDERS/categoryName de
-// tournaments/domain/category.ts en vez de duplicarlos acá.
-export { CATEGORY_LEVELS, CATEGORY_GENDERS, categoryName } from "@/modules/tournaments/domain/category";
+// Nivel/género/nombre/edad de categoría son un concepto genérico, no propio
+// de Torneo — se reutilizan de tournaments/domain/category.ts en vez de
+// duplicarlos acá.
+export {
+  CATEGORY_LEVELS,
+  CATEGORY_GENDERS,
+  categoryName,
+  categoryDisplayName,
+  AGE_CATEGORIES,
+  type AgeCategoryKey,
+} from "@/modules/tournaments/domain/category";

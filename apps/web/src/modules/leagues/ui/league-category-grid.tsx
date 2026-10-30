@@ -3,11 +3,15 @@
 import { useState, useTransition } from "react";
 import { motion } from "motion/react";
 import { Check, CircleNotch } from "@phosphor-icons/react";
-import { toggleLeagueCategoryAction } from "../application/leagueCategoryActions";
-import { CATEGORY_LEVELS, CATEGORY_GENDERS, type LeagueCategory } from "../domain/leagueCategory";
+import { toggleLeagueAgeCategoryAction, toggleLeagueCategoryAction } from "../application/leagueCategoryActions";
+import { AGE_CATEGORIES, CATEGORY_LEVELS, CATEGORY_GENDERS, type LeagueCategory } from "../domain/leagueCategory";
 import { cn } from "@/lib/utils";
 
-function cellKey(level: number, gender: string): string {
+function cellKey(level: number, gender: string | null): string {
+  return `${level}-${gender}`;
+}
+
+function ageCellKey(level: string, gender: string | null): string {
   return `${level}-${gender}`;
 }
 
@@ -19,6 +23,7 @@ export function LeagueCategoryGrid({ leagueId, categories: initialCategories }: 
   const [isPending, startTransition] = useTransition();
 
   const categoryByCell = new Map(categories.map((c) => [cellKey(Number(c.level), c.genderRestriction), c]));
+  const categoryByAgeCell = new Map(categories.map((c) => [ageCellKey(c.level, c.genderRestriction), c]));
 
   function handleToggle(level: number, gender: "MALE" | "FEMALE" | "MIXED") {
     const key = cellKey(level, gender);
@@ -35,7 +40,33 @@ export function LeagueCategoryGrid({ leagueId, categories: initialCategories }: 
       if (existing) {
         setCategories((prev) => prev.filter((c) => c.id !== existing.id));
       } else if (result.createdId) {
-        setCategories((prev) => [...prev, { id: result.createdId!, leagueId, name: "", level: String(level), genderRestriction: gender }]);
+        setCategories((prev) => [
+          ...prev,
+          { id: result.createdId!, leagueId, name: "", level: String(level), genderRestriction: gender, minAge: null, maxAge: null },
+        ]);
+      }
+    });
+  }
+
+  function handleToggleAge(def: (typeof AGE_CATEGORIES)[number]) {
+    const key = ageCellKey(def.level, def.gender);
+    const existing = categoryByAgeCell.get(key) ?? null;
+    setError(null);
+    setPendingCell(key);
+    startTransition(async () => {
+      const result = await toggleLeagueAgeCategoryAction(leagueId, existing?.id ?? null, def.key);
+      setPendingCell(null);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      if (existing) {
+        setCategories((prev) => prev.filter((c) => c.id !== existing.id));
+      } else if (result.createdId) {
+        setCategories((prev) => [
+          ...prev,
+          { id: result.createdId!, leagueId, name: def.name, level: def.level, genderRestriction: def.gender, minAge: def.minAge, maxAge: def.maxAge },
+        ]);
       }
     });
   }
@@ -94,6 +125,42 @@ export function LeagueCategoryGrid({ leagueId, categories: initialCategories }: 
           </tbody>
         </table>
       </div>
+
+      <div className="flex flex-col gap-2 border-t border-border pt-3">
+        <span className="text-xs font-medium text-muted-foreground">Categorías por edad</span>
+        <div className="flex flex-wrap gap-2">
+          {AGE_CATEGORIES.map((def) => {
+            const key = ageCellKey(def.level, def.gender);
+            const active = categoryByAgeCell.has(key);
+            const cellPending = isPending && pendingCell === key;
+            return (
+              <motion.button
+                key={def.key}
+                type="button"
+                disabled={isPending}
+                whileTap={{ scale: 0.96 }}
+                onClick={() => handleToggleAge(def)}
+                aria-pressed={active}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors duration-150",
+                  active
+                    ? "border-accent bg-accent text-accent-foreground"
+                    : "border-border bg-surface text-muted-foreground hover:border-border-strong",
+                  isPending && "cursor-wait"
+                )}
+              >
+                {cellPending ? (
+                  <CircleNotch className="size-4 animate-spin" weight="bold" />
+                ) : (
+                  active && <Check className="size-4" weight="bold" />
+                )}
+                {def.name}
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
+
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <p className="text-xs text-muted-foreground">
         {categories.length === 0

@@ -1,4 +1,5 @@
 import type { GenderType } from "@/lib/supabase/database.types";
+import { calculateAge } from "@/lib/age";
 
 export interface PlayerSearchResult {
   playerId: string;
@@ -19,12 +20,15 @@ export interface TeamWithPlayers {
  * exactamente un hombre y una mujer si la categoría es Mixta. No hay RPC ni
  * constraint de DB para esto (el esquema viejo tampoco la tenía — la
  * inscripción de teams siempre fue un insert directo del cliente) así que
- * se valida acá antes de insertar.
+ * se valida acá antes de insertar. categoryGender null (hoy solo Junior)
+ * significa "no importa el género" — no se valida nada.
  */
 export function validateTeamGender(
-  categoryGender: "MALE" | "FEMALE" | "MIXED",
+  categoryGender: "MALE" | "FEMALE" | "MIXED" | null,
   playerGenders: (GenderType | null)[]
 ): string | null {
+  if (categoryGender === null) return null;
+
   if (playerGenders.some((g) => !g)) {
     return "Ambos jugadores necesitan un género asignado antes de inscribirse.";
   }
@@ -41,6 +45,36 @@ export function validateTeamGender(
 
   if (genders.some((g) => g !== categoryGender)) {
     return `Esta categoría es ${categoryGender === "MALE" ? "masculina" : "femenina"} — ambos jugadores deben serlo.`;
+  }
+  return null;
+}
+
+/**
+ * Elegibilidad por edad (Master 40+, Junior -18, pedido explícito) — mismo
+ * criterio que validateTeamGender: sin constraint de DB, se valida acá antes
+ * de insertar el team. minAge/maxAge null (todas las categorías por nivel)
+ * significa "sin restricción de edad" — no se valida nada, ni siquiera
+ * exige fecha de nacimiento cargada.
+ */
+export function validateTeamAge(
+  minAge: number | null,
+  maxAge: number | null,
+  playerBirthDates: (string | null)[],
+  referenceDate: string
+): string | null {
+  if (minAge === null && maxAge === null) return null;
+
+  if (playerBirthDates.some((b) => !b)) {
+    return "Ambos jugadores necesitan la fecha de nacimiento cargada para inscribirse en esta categoría.";
+  }
+
+  const ages = playerBirthDates.map((b) => calculateAge(b as string, referenceDate));
+
+  if (minAge !== null && ages.some((a) => a < minAge)) {
+    return `Esta categoría es para mayores de ${minAge} años — ambos jugadores deben cumplir la edad mínima.`;
+  }
+  if (maxAge !== null && ages.some((a) => a > maxAge)) {
+    return `Esta categoría es para menores de ${maxAge + 1} años — ambos jugadores deben cumplir el límite de edad.`;
   }
   return null;
 }
