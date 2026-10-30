@@ -9,7 +9,7 @@ import { LeaguePublishPanel } from "@/modules/leagues/ui/league-publish-panel";
 import { LeagueDatosForm } from "@/modules/leagues/ui/league-datos-form";
 import { StepWizard, type WizardStep } from "@/modules/tournaments/ui/wizard-shell";
 import { LEAGUE_WIZARD_STEP_LABELS } from "@/modules/leagues/domain/league";
-import { categoryName } from "@/modules/tournaments/domain/category";
+import { categoryDisplayName } from "@/modules/tournaments/domain/category";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -64,8 +64,8 @@ export default async function EditarLigaPage({ params }: { params: Promise<{ lea
                 <LeagueEnrollmentPanel
                   leagueId={leagueId}
                   categoryId={category.id}
-                  categoryGender={category.genderRestriction as "MALE" | "FEMALE" | "MIXED"}
-                  categoryLabel={categoryName(Number(category.level), category.genderRestriction as "MALE" | "FEMALE" | "MIXED")}
+                  categoryGender={category.genderRestriction as "MALE" | "FEMALE" | "MIXED" | null}
+                  categoryLabel={categoryDisplayName(category)}
                   teams={teams}
                 />
               </Card>

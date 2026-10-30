@@ -88,7 +88,7 @@ function AddTeamForm({
 }: {
   leagueId: string;
   categoryId: string;
-  categoryGender: "MALE" | "FEMALE" | "MIXED";
+  categoryGender: "MALE" | "FEMALE" | "MIXED" | null;
   onEnrolled: (team: TeamWithPlayers) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -232,6 +232,7 @@ function CreatePlayerInlineForm({
   const [email, setEmail] = useState("");
   const [gender, setGender] = useState<GenderType>("MALE");
   const [category, setCategory] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -240,7 +241,16 @@ function CreatePlayerInlineForm({
   function handleCreate() {
     setError(null);
     startTransition(async () => {
-      const result = await createPlayerForLeagueAction(leagueId, firstName, lastName, gender, Number(category) || 0, phone, email);
+      const result = await createPlayerForLeagueAction(
+        leagueId,
+        firstName,
+        lastName,
+        gender,
+        Number(category) || 0,
+        phone,
+        email,
+        birthDate.trim() || null
+      );
       if (result.error || !result.player) {
         setError(result.error ?? "No se pudo crear el jugador.");
         return;
@@ -280,6 +290,9 @@ function CreatePlayerInlineForm({
             <option value="FEMALE">Femenino</option>
             <option value="OTHER">Otro</option>
           </Select>
+        </Field>
+        <Field id="birthDate" label="Fecha de nacimiento" optional>
+          <Input id="birthDate" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
         </Field>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -344,7 +357,7 @@ export function LeagueEnrollmentPanel({
 }: {
   leagueId: string;
   categoryId: string;
-  categoryGender: "MALE" | "FEMALE" | "MIXED";
+  categoryGender: "MALE" | "FEMALE" | "MIXED" | null;
   categoryLabel: string;
   teams: TeamWithPlayers[];
 }) {

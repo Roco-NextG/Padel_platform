@@ -12,7 +12,7 @@ import { SponsorsManager } from "@/modules/tournaments/ui/sponsors-manager";
 import { PublishPanel } from "@/modules/tournaments/ui/publish-panel";
 import { TournamentDatosForm } from "@/modules/tournaments/ui/tournament-datos-form";
 import { StepWizard, type WizardStep } from "@/modules/tournaments/ui/wizard-shell";
-import { categoryName } from "@/modules/tournaments/domain/category";
+import { categoryDisplayName } from "@/modules/tournaments/domain/category";
 import { WIZARD_STEP_LABELS } from "@/modules/tournaments/domain/tournament";
 import { Card } from "@/components/ui/card";
 
@@ -85,8 +85,8 @@ export default async function EditarTorneoPage({ params }: { params: Promise<{ t
                 <EnrollmentPanel
                   tournamentId={tournamentId}
                   categoryId={category.id}
-                  categoryGender={category.genderRestriction as "MALE" | "FEMALE" | "MIXED"}
-                  categoryLabel={categoryName(Number(category.level), category.genderRestriction as "MALE" | "FEMALE" | "MIXED")}
+                  categoryGender={category.genderRestriction as "MALE" | "FEMALE" | "MIXED" | null}
+                  categoryLabel={categoryDisplayName(category)}
                   teams={teams}
                 />
               </Card>

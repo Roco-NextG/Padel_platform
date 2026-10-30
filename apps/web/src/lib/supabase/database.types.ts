@@ -159,6 +159,7 @@ export interface Database {
           current_rating_deviation: number | null;
           category: number | null;
           gender: GenderType | null;
+          birth_date: string | null;
           created_at: string;
         };
         Insert: {
@@ -173,6 +174,7 @@ export interface Database {
           current_rating_deviation?: number | null;
           category?: number | null;
           gender?: GenderType | null;
+          birth_date?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["players"]["Insert"]>;
       };
@@ -244,6 +246,8 @@ export interface Database {
           gender_restriction: GenderType | null;
           max_teams: number | null;
           uses_group_stage: boolean;
+          min_age: number | null;
+          max_age: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -255,6 +259,8 @@ export interface Database {
           gender_restriction?: GenderType | null;
           max_teams?: number | null;
           uses_group_stage?: boolean;
+          min_age?: number | null;
+          max_age?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["tournament_categories"]["Insert"]>;
       };
@@ -308,6 +314,8 @@ export interface Database {
           name: string;
           level: string | null;
           gender_restriction: GenderType | null;
+          min_age: number | null;
+          max_age: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -317,6 +325,8 @@ export interface Database {
           name: string;
           level?: string | null;
           gender_restriction?: GenderType | null;
+          min_age?: number | null;
+          max_age?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["league_categories"]["Insert"]>;
       };
@@ -654,6 +664,7 @@ export interface Database {
           p_category: number;
           p_phone?: string | null;
           p_email?: string | null;
+          p_birth_date?: string | null;
         };
         Returns: Database["public"]["Tables"]["players"]["Row"];
       };
@@ -665,6 +676,7 @@ export interface Database {
           p_phone: string | null;
           p_category: number;
           p_gender?: GenderType | null;
+          p_birth_date?: string | null;
         };
         Returns: Database["public"]["Tables"]["players"]["Row"];
       };
@@ -677,12 +689,13 @@ export interface Database {
           p_phone: string | null;
           p_category: number | null;
           p_gender: GenderType | null;
+          p_birth_date?: string | null;
         };
         Returns: Database["public"]["Tables"]["players"]["Row"];
       };
       get_players_by_ids: {
         Args: { p_player_ids: string[] };
-        Returns: { player_id: string; gender: GenderType | null; category: number | null }[];
+        Returns: { player_id: string; gender: GenderType | null; category: number | null; birth_date: string | null }[];
       };
       assign_player_category: {
         Args: { p_player_id: string; p_category: number };
@@ -728,6 +741,7 @@ export interface Database {
           current_rating_deviation: number | null;
           category: number | null;
           gender: GenderType | null;
+          birth_date: string | null;
         }[];
       };
       get_player: {
@@ -742,6 +756,7 @@ export interface Database {
           current_rating_deviation: number | null;
           category: number | null;
           gender: GenderType | null;
+          birth_date: string | null;
         }[];
       };
       create_club_as_organizer: {

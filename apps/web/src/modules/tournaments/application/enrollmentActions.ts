@@ -5,12 +5,14 @@ import {
   assignPlayerCategory,
   createPlayerForEnrollment,
   createTeam,
+  fetchCategoryAgeRange,
   getPlayersByIds,
   removeTeam,
   searchPlayers,
 } from "../infrastructure/enrollmentRepository";
-import { validateTeamGender } from "../domain/enrollment";
+import { validateTeamAge, validateTeamGender } from "../domain/enrollment";
 import { requireTournamentManager } from "./authGuard";
+import { getTournament } from "./getTournaments";
 import type { GenderType } from "@/lib/supabase/database.types";
 import type { PlayerSearchResult } from "../domain/enrollment";
 
@@ -44,7 +46,8 @@ export async function createPlayerAction(
   gender: GenderType,
   category: number,
   phone: string,
-  email: string
+  email: string,
+  birthDate: string | null = null
 ): Promise<CreatePlayerState> {
   const auth = await requireTournamentManager(tournamentId);
   if (!auth.ok) return { error: auth.error, player: null };
@@ -53,9 +56,10 @@ export async function createPlayerAction(
   if (!phone.trim()) return { error: "El teléfono es obligatorio.", player: null };
   if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) return { error: "El email no es válido.", player: null };
   if (category < 1 || category > 7) return { error: "La categoría debe estar entre 1 y 7.", player: null };
+  if (birthDate && Number.isNaN(Date.parse(birthDate))) return { error: "La fecha de nacimiento no es válida.", player: null };
 
   try {
-    const player = await createPlayerForEnrollment(firstName, lastName, gender, category, phone.trim(), email.trim());
+    const player = await createPlayerForEnrollment(firstName, lastName, gender, category, phone.trim(), email.trim(), birthDate);
     return { error: null, player };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo crear el jugador.", player: null };
@@ -87,7 +91,7 @@ export async function assignCategoryAction(tournamentId: string, playerId: strin
 export async function enrollTeamAction(
   tournamentId: string,
   categoryId: string,
-  categoryGender: "MALE" | "FEMALE" | "MIXED",
+  categoryGender: "MALE" | "FEMALE" | "MIXED" | null,
   playerIds: [string, string]
 ): Promise<EnrollTeamState> {
   const auth = await requireTournamentManager(tournamentId);
@@ -106,6 +110,19 @@ export async function enrollTeamAction(
       players.map((p) => p.gender)
     );
     if (genderError) return { error: genderError, teamId: null };
+
+    const { minAge, maxAge } = await fetchCategoryAgeRange(categoryId);
+    if (minAge !== null || maxAge !== null) {
+      const tournament = await getTournament(tournamentId);
+      const referenceDate = tournament?.startDate ?? new Date().toISOString().slice(0, 10);
+      const ageError = validateTeamAge(
+        minAge,
+        maxAge,
+        players.map((p) => p.birthDate),
+        referenceDate
+      );
+      if (ageError) return { error: ageError, teamId: null };
+    }
 
     teamId = await createTeam(categoryId, playerIds);
   } catch (e) {

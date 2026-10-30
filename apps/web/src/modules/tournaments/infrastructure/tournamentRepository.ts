@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { CreateTournamentInput, Tournament, UpdateTournamentInput } from "../domain/tournament";
 import type { TournamentCategory } from "../domain/category";
-import { categoryName } from "../domain/category";
+import { categoryName, AGE_CATEGORIES, type AgeCategoryKey } from "../domain/category";
 import type { ClubSurfaceAccount } from "@/modules/shell/infrastructure/accountRepository";
 import { DEFAULT_TIME_ZONE } from "@/lib/timezone";
 
@@ -157,7 +157,7 @@ export async function fetchCategories(tournamentId: string): Promise<TournamentC
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tournament_categories")
-    .select("id, tournament_id, name, level, gender_restriction, uses_group_stage")
+    .select("id, tournament_id, name, level, gender_restriction, uses_group_stage, min_age, max_age")
     .eq("tournament_id", tournamentId)
     .order("level");
   if (error) throw new Error(error.message);
@@ -167,8 +167,14 @@ export async function fetchCategories(tournamentId: string): Promise<TournamentC
     tournamentId: c.tournament_id,
     name: c.name,
     level: c.level ?? "",
-    genderRestriction: c.gender_restriction ?? "MIXED",
+    // Antes defaulteaba a "MIXED" cuando venía null — eso nunca pasaba en la
+    // práctica (el grid solo inserta MALE/FEMALE/MIXED explícito), pero con
+    // Junior (sin restricción de género, ver 0034) null es un valor real que
+    // significa "no importa el género" — MIXED sería incorrecto acá.
+    genderRestriction: c.gender_restriction,
     usesGroupStage: c.uses_group_stage,
+    minAge: c.min_age,
+    maxAge: c.max_age,
   }));
 }
 
@@ -187,6 +193,29 @@ export async function addCategory(
       level: String(level),
       gender_restriction: gender,
       uses_group_stage: usesGroupStage,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return data.id;
+}
+
+/** Master/Junior — mismo insert que addCategory, pero level/gender/min_age/max_age salen de AGE_CATEGORIES en vez de venir de la grilla 1ra..7ma. */
+export async function addAgeCategory(tournamentId: string, key: AgeCategoryKey, usesGroupStage: boolean): Promise<string> {
+  const def = AGE_CATEGORIES.find((a) => a.key === key);
+  if (!def) throw new Error(`addAgeCategory: categoría desconocida "${key}"`);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournament_categories")
+    .insert({
+      tournament_id: tournamentId,
+      name: def.name,
+      level: def.level,
+      gender_restriction: def.gender,
+      uses_group_stage: usesGroupStage,
+      min_age: def.minAge,
+      max_age: def.maxAge,
     })
     .select("id")
     .single();

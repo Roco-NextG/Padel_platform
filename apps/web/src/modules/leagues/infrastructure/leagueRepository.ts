@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { CreateLeagueInput, League, UpdateLeagueInput } from "../domain/league";
 import type { LeagueCategory } from "../domain/leagueCategory";
-import { categoryName } from "@/modules/tournaments/domain/category";
+import { categoryName, AGE_CATEGORIES, type AgeCategoryKey } from "@/modules/tournaments/domain/category";
 import type { ClubSurfaceAccount } from "@/modules/shell/infrastructure/accountRepository";
 import { DEFAULT_TIME_ZONE } from "@/lib/timezone";
 
@@ -136,7 +136,7 @@ export async function fetchLeagueCategories(leagueId: string): Promise<LeagueCat
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("league_categories")
-    .select("id, league_id, name, level, gender_restriction")
+    .select("id, league_id, name, level, gender_restriction, min_age, max_age")
     .eq("league_id", leagueId)
     .order("level");
   if (error) throw new Error(error.message);
@@ -146,7 +146,10 @@ export async function fetchLeagueCategories(leagueId: string): Promise<LeagueCat
     leagueId: c.league_id,
     name: c.name,
     level: c.level ?? "",
-    genderRestriction: c.gender_restriction ?? "MIXED",
+    // null real (Junior) distinto de MIXED — ver tournamentRepository.fetchCategories.
+    genderRestriction: c.gender_restriction,
+    minAge: c.min_age,
+    maxAge: c.max_age,
   }));
 }
 
@@ -159,6 +162,28 @@ export async function addLeagueCategory(leagueId: string, level: number, gender:
       name: categoryName(level, gender),
       level: String(level),
       gender_restriction: gender,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return data.id;
+}
+
+/** Master/Junior — mismo insert que addLeagueCategory, ver addAgeCategory (tournamentRepository.ts). */
+export async function addLeagueAgeCategory(leagueId: string, key: AgeCategoryKey): Promise<string> {
+  const def = AGE_CATEGORIES.find((a) => a.key === key);
+  if (!def) throw new Error(`addLeagueAgeCategory: categoría desconocida "${key}"`);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("league_categories")
+    .insert({
+      league_id: leagueId,
+      name: def.name,
+      level: def.level,
+      gender_restriction: def.gender,
+      min_age: def.minAge,
+      max_age: def.maxAge,
     })
     .select("id")
     .single();

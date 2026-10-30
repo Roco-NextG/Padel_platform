@@ -25,6 +25,14 @@ export async function searchPlayersForLeague(leagueId: string, query: string): P
   }));
 }
 
+/** Rango de edad de la categoría de Liga (null/null = sin restricción) — para validateTeamAge en enrollLeagueTeamAction. */
+export async function fetchLeagueCategoryAgeRange(categoryId: string): Promise<{ minAge: number | null; maxAge: number | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("league_categories").select("min_age, max_age").eq("id", categoryId).single();
+  if (error) throw new Error(error.message);
+  return { minAge: data.min_age, maxAge: data.max_age };
+}
+
 export async function fetchTeamsForLeagueCategory(categoryId: string): Promise<TeamWithPlayers[]> {
   const supabase = await createClient();
   const { data, error } = await supabase

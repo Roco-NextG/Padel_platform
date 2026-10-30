@@ -18,6 +18,7 @@ function parsePlayerInput(formData: FormData): { input: PlayerInput | null; erro
   const phone = ((formData.get("phone") as string | null) ?? "").trim() || null;
   const categoryRaw = (formData.get("category") as string | null) ?? "";
   const genderRaw = (formData.get("gender") as string | null) ?? "";
+  const birthDateRaw = ((formData.get("birthDate") as string | null) ?? "").trim() || null;
 
   if (!firstName) return { input: null, error: "El nombre es obligatorio." };
   if (!lastName) return { input: null, error: "El apellido es obligatorio." };
@@ -25,6 +26,9 @@ function parsePlayerInput(formData: FormData): { input: PlayerInput | null; erro
   const category = Number(categoryRaw);
   if (!categoryRaw || Number.isNaN(category) || category < 1 || category > 7) {
     return { input: null, error: "Elegí una categoría entre 1 y 7." };
+  }
+  if (birthDateRaw && Number.isNaN(Date.parse(birthDateRaw))) {
+    return { input: null, error: "La fecha de nacimiento no es válida." };
   }
 
   return {
@@ -35,6 +39,7 @@ function parsePlayerInput(formData: FormData): { input: PlayerInput | null; erro
       phone,
       category,
       gender: (genderRaw || null) as GenderType | null,
+      birthDate: birthDateRaw,
     },
     error: null,
   };

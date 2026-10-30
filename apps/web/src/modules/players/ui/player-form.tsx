@@ -74,6 +74,9 @@ export function PlayerForm({
             <option value="OTHER">Otro</option>
           </Select>
         </Field>
+        <Field id="birthDate" label="Fecha de nacimiento" optional>
+          <Input id="birthDate" name="birthDate" type="date" defaultValue={player?.birthDate ?? ""} />
+        </Field>
       </div>
       <div className="flex gap-2">
         <SubmitButton label={player ? "Guardar" : "Crear jugador"} />
