@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createLeagueSchema, updateLeagueSchema } from "../domain/league";
-import { createLeague, updateLeague } from "../infrastructure/leagueRepository";
+import { createLeague, deleteLeague, updateLeague } from "../infrastructure/leagueRepository";
 import { fetchClubSurfaceAccount } from "@/modules/shell/infrastructure/accountRepository";
 import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
 import { requireLeagueManager } from "./leagueAuthGuard";
@@ -74,4 +74,23 @@ export async function updateLeagueAction(leagueId: string, _prev: UpdateLeagueSt
   revalidatePath(`/dashboard/ligas/${leagueId}/editar`);
   revalidatePath("/dashboard/torneos");
   return { error: null, ok: true };
+}
+
+export interface DeleteLeagueState {
+  error: string | null;
+}
+
+export async function deleteLeagueAction(leagueId: string): Promise<DeleteLeagueState> {
+  const auth = await requireLeagueManager(leagueId);
+  if (!auth.ok) return { error: auth.error };
+
+  try {
+    await deleteLeague(leagueId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo borrar la liga." };
+  }
+
+  revalidatePath("/dashboard/torneos");
+  revalidatePath("/dashboard");
+  return { error: null };
 }

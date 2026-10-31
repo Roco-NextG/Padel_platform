@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createTournamentSchema, updateTournamentSchema } from "../domain/tournament";
-import { createTournament, updateTournament } from "../infrastructure/tournamentRepository";
+import { createTournament, deleteTournament, updateTournament } from "../infrastructure/tournamentRepository";
 import { fetchClubSurfaceAccount } from "@/modules/shell/infrastructure/accountRepository";
 import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
 import { requireTournamentManager } from "./authGuard";
@@ -81,4 +81,23 @@ export async function updateTournamentAction(
   revalidatePath(`/dashboard/torneos/${tournamentId}/editar`);
   revalidatePath("/dashboard/torneos");
   return { error: null, ok: true };
+}
+
+export interface DeleteTournamentState {
+  error: string | null;
+}
+
+export async function deleteTournamentAction(tournamentId: string): Promise<DeleteTournamentState> {
+  const auth = await requireTournamentManager(tournamentId);
+  if (!auth.ok) return { error: auth.error };
+
+  try {
+    await deleteTournament(tournamentId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo borrar el torneo." };
+  }
+
+  revalidatePath("/dashboard/torneos");
+  revalidatePath("/dashboard");
+  return { error: null };
 }

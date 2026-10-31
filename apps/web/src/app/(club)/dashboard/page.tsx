@@ -48,9 +48,29 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const courts = selectedClubId ? await fetchClubCourts(selectedClubId) : [];
 
   if (tournaments.length === 0) {
+    // Solo una cuenta Club es dueña de pistas propias (un Organizador aloja
+    // en clubes de terceros, nunca tiene las suyas) — y recién acá, antes de
+    // que arranque a armar un torneo, es el momento de avisarle si todavía
+    // no cargó ninguna: si no, descubre que le faltan al llegar a Partidos,
+    // con el torneo ya armado encima (pedido explícito del audit de
+    // onboarding).
+    const hasNoCourts = account.role === "Club" && courts.length === 0;
     return (
       <div className="flex flex-col gap-6">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        {hasNoCourts && (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-dashed border-border-strong bg-surface-secondary px-4 py-3">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-foreground">Todavía no cargaste tus pistas</span>
+              <span className="text-xs text-muted-foreground">Las vas a necesitar para agendar partidos — cargalas antes de armar tu primer torneo.</span>
+            </div>
+            <Link href="/dashboard/configuracion" className="shrink-0">
+              <Button size="sm" variant="secondary">
+                Cargar pistas
+              </Button>
+            </Link>
+          </div>
+        )}
         <EmptyState
           icon={Trophy}
           title="Todavía no creaste ningún torneo"

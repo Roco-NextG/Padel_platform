@@ -33,8 +33,13 @@ export default async function BienvenidaPage() {
           {role
             ? `Tu cuenta de ${roleLabel(role)} (${context.email}) ya está activa.`
             : `Tu cuenta (${context.email}) ya está activa.`}{" "}
-          El panel completo todavía está en construcción — pronto vas a poder gestionar tus torneos
-          desde acá.
+          {/* Club/Organizador/Admin ahora van directo a su panel (homePathForRoles,
+              ver invites/application/actions.ts) — quien llega acá es siempre un
+              Jugador, que todavía no tiene panel propio, así que el mensaje es real
+              para esta audiencia (antes decía esto para TODOS, incluido Club/
+              Organizador con el panel ya completo, lo cual era falso). */}
+          Todavía no tenés un panel propio como jugador — tu club u organizador gestiona tus
+          torneos y partidos desde el suyo.
         </p>
       </div>
       <form action={signOutAction}>

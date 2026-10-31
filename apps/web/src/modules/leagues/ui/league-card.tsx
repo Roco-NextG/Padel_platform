@@ -1,10 +1,13 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { Plus, Trophy, SquaresFour, UsersThree, ArrowRight } from "@phosphor-icons/react";
+import { Plus, Trophy, SquaresFour, UsersThree, ArrowRight, TrashSimple } from "@phosphor-icons/react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { deleteLeagueAction } from "../application/leagueWizardActions";
 import { leagueCardStatus, LEAGUE_CARD_STATUS_LABELS, type League } from "../domain/league";
 
 const CARD_STATUS_TONE = {
@@ -23,6 +26,26 @@ export function LeagueCard({ league }: { league: League }) {
   const editPath = `/dashboard/ligas/${league.id}/editar`;
   const viewPath = `/dashboard/ligas/${league.id}`;
   const status = leagueCardStatus(league);
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleDelete(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm(`¿Borrar "${league.name}"? Se borran también sus categorías, inscripciones y partidos — no se puede deshacer.`)) {
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteLeagueAction(league.id);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   return (
     <motion.div whileHover={{ y: -3 }} transition={{ type: "spring", stiffness: 400, damping: 28 }}>
@@ -66,14 +89,29 @@ export function LeagueCard({ league }: { league: League }) {
                 {league.teamCount} {league.teamCount === 1 ? "pareja" : "parejas"}
               </span>
             </div>
-            <Link
-              href={viewPath}
-              className="relative z-[1] flex shrink-0 items-center gap-1 rounded-full border border-border-strong bg-surface px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-surface-secondary"
-            >
-              Ver liga
-              <ArrowRight className="size-3" />
-            </Link>
+            <div className="relative z-[1] flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={handleDelete}
+                aria-label={`Borrar ${league.name}`}
+                title="Borrar liga"
+                className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive-muted hover:text-destructive disabled:opacity-50"
+              >
+                <TrashSimple className="size-3.5" />
+              </button>
+              <Link
+                href={viewPath}
+                className="flex shrink-0 items-center gap-1 rounded-full border border-border-strong bg-surface px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-surface-secondary"
+              >
+                Ver liga
+                <ArrowRight className="size-3" />
+              </Link>
+            </div>
           </div>
+          {error && (
+            <p className="relative z-[1] -mt-1 text-right text-[11px] text-destructive">{error}</p>
+          )}
         </div>
       </Card>
     </motion.div>
