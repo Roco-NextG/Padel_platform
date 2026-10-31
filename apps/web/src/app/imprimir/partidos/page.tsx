@@ -140,7 +140,6 @@ export default async function ImprimirPartidosPage({
       <div className="relative mx-6 mt-6 overflow-hidden rounded-2xl bg-[#16171a] px-7 py-6 bg-[radial-gradient(circle_at_14%_0%,var(--accent-glow),transparent_62%)] print:mx-0 print:mt-0 print:rounded-none">
         <div className="flex items-start justify-between gap-6">
           <div className="flex flex-col gap-3">
-            <DeuceUpWordmark className="h-5 w-auto text-[#f5f5f3]" />
             <div>
               <h2 className="text-[26px] font-semibold leading-tight tracking-tight text-[#f5f5f3]">{tournament.name}</h2>
               <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[#f5f5f3]/70">
@@ -228,6 +227,10 @@ export default async function ImprimirPartidosPage({
             </table>
           </div>
         )}
+      </div>
+
+      <div className="flex items-center justify-center border-t border-border px-6 py-8 print:py-5">
+        <DeuceUpWordmark className="h-10 w-auto text-foreground" />
       </div>
     </div>
   );
