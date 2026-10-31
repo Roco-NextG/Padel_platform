@@ -205,10 +205,15 @@ function AccountRow({
   }
 
   function handleToggleActive() {
+    const nextActive = !account.isActive;
     setError(null);
     startTransition(async () => {
-      const result = await setAccountActiveAction(account.accountType, account.entityId, account.userId, !account.isActive);
-      setError(result.error);
+      const result = await setAccountActiveAction(account.accountType, account.entityId, account.userId, nextActive);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      onUpdate({ isActive: nextActive });
     });
   }
 
