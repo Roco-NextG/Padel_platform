@@ -42,8 +42,10 @@ export default async function EditarTorneoPage({ params }: { params: Promise<{ t
       content: (
         <div className="mx-auto flex max-w-2xl flex-col gap-3">
           <div>
-            <h2 className="text-sm font-medium text-foreground">Patrocinadores</h2>
-            <p className="text-xs text-muted-foreground">Aparecen en el torneo público una vez que lo publiques.</p>
+            <h2 className="text-sm font-medium text-foreground">Patrocinadores (opcional)</h2>
+            <p className="text-xs text-muted-foreground">
+              Aparecen en el torneo público una vez que lo publiques — podés saltear este paso y agregarlos después.
+            </p>
           </div>
           <Card>
             <SponsorsManager tournamentId={tournamentId} sponsors={sponsors} />

@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { setPasswordSchema } from "../domain/schemas";
 import { translateAuthError } from "@/modules/auth/domain/authErrors";
+import { getCurrentUserContext } from "@/modules/auth/application/getCurrentUserContext";
+import { homePathForRoles } from "@/modules/auth/domain/roles";
 
 export interface SetPasswordState {
   error: string | null;
@@ -61,5 +63,13 @@ export async function setPasswordAction(
     return { error: "No se pudo activar tu invitación. Contacta al administrador." };
   }
 
-  redirect("/bienvenida");
+  // Antes esto redirigía siempre a /bienvenida, una pantalla muerta con copy
+  // vieja ("el panel todavía está en construcción") y sin ningún link al
+  // dashboard — el primer momento de CUALQUIER usuario nuevo era un
+  // callejón sin salida. redeem_invite() ya attachó el role_assignment acá
+  // arriba, así que getCurrentUserContext() ya lo ve (misma conexión,
+  // commit ya hecho) y homePathForRoles() manda a Club/Organizador
+  // directo a /dashboard (el mismo criterio que ya usa un login normal).
+  const context = await getCurrentUserContext();
+  redirect(context ? homePathForRoles(context.roles) : "/bienvenida");
 }

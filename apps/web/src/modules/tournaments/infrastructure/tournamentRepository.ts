@@ -269,3 +269,15 @@ export async function setTournamentPublished(tournamentId: string, published: bo
     .eq("id", tournamentId);
   if (error) throw new Error(error.message);
 }
+
+/** Cascada completa (categorías, grupos, fases, teams, matches, rating_events) vía ON DELETE CASCADE — ver 0035. */
+export async function deleteTournament(tournamentId: string): Promise<void> {
+  const supabase = await createClient();
+  // .select() fuerza a Postgrest a devolver las filas borradas — sin esto,
+  // un delete bloqueado por RLS (0 filas afectadas) viene con error: null
+  // igual que uno exitoso, y el caller termina creyendo que borró algo que
+  // en realidad sigue ahí.
+  const { data, error } = await supabase.from("tournaments").delete().eq("id", tournamentId).select("id");
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error("No se pudo borrar el torneo.");
+}
