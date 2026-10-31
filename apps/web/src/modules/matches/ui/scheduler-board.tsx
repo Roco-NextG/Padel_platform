@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { CaretLeft, CaretRight, X } from "@phosphor-icons/react";
+import { CaretLeft, CaretRight, FilePdf, X } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { zonedDateKey, zonedSlotToIso, zonedTimeKey, shiftZonedDateKey } from "@/lib/timezone";
 import { scheduleMatchAction, unscheduleMatchAction } from "../application/matchActions";
@@ -45,9 +45,9 @@ function MatchChip({ match, placed }: { match: MatchListItem; placed: boolean })
       )}
     >
       <span className="text-[9px] font-bold uppercase tracking-wide text-accent-text">{match.categoryName}</span>
-      <span className="truncate text-[11px] font-medium leading-tight text-foreground">
-        {matchTeamLabel(match.teamA)} <span className="text-muted-foreground">vs</span> {matchTeamLabel(match.teamB)}
-      </span>
+      <span className="text-[10.5px] font-medium leading-snug text-foreground">{matchTeamLabel(match.teamA)}</span>
+      <span className="text-[8.5px] font-semibold uppercase tracking-wide text-muted-foreground">vs</span>
+      <span className="text-[10.5px] font-medium leading-snug text-foreground">{matchTeamLabel(match.teamB)}</span>
     </div>
   );
 }
@@ -269,6 +269,15 @@ export function SchedulerBoard({
               <CaretRight className="size-4" />
             </button>
           </div>
+          <a
+            href={`/imprimir/partidos?torneo=${tournamentId}&fecha=${selectedDate}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-9 items-center gap-1.5 rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-foreground hover:bg-surface-secondary"
+          >
+            <FilePdf className="size-4" />
+            Descargar PDF del día
+          </a>
           <div className="flex flex-wrap gap-1.5">
             {categories.map((c) => (
               <button
@@ -299,7 +308,7 @@ export function SchedulerBoard({
             <div className="overflow-auto rounded-lg border border-border bg-background">
               <div
                 className="grid gap-px bg-border"
-                style={{ gridTemplateColumns: `58px repeat(${courts.length}, minmax(108px, 1fr))`, minWidth: 960 }}
+                style={{ gridTemplateColumns: `58px repeat(${courts.length}, minmax(136px, 1fr))`, minWidth: 960 }}
               >
                 <div className="sticky left-0 top-0 z-[3] bg-background" />
                 {courts.map((c) => (
