@@ -13,7 +13,8 @@ import { DeuceUpWordmark } from "@/components/brand/deuceup-wordmark";
 
 export const metadata: Metadata = { title: "Planificación del día — DeuceUp" };
 
-const SLOT_MINUTES = 30;
+/** Igual granularidad que el planificador en pantalla (scheduler-board.tsx) — un partido puede arrancar cada 15min ahí, así que esta grilla necesita el mismo paso o los partidos que no caigan en :00/:30 desaparecerían del PDF (buildDaySlots no encontraría su horario de inicio). */
+const SLOT_MINUTES = 15;
 
 function timeKeyToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -197,10 +198,14 @@ export default async function ImprimirPartidosPage({
                 </tr>
               </thead>
               <tbody>
-                {slots.map((time, rowIdx) => (
-                  <tr key={time} className={rowIdx % 2 === 1 ? "bg-surface-secondary/50" : undefined}>
+                {slots.map((time) => (
+                  // Zebra por HORA (no por fila) — con filas cada 15min, alternar por índice de fila
+                  // tiñe :15/:45 en vez de agrupar visualmente cada hora completa.
+                  <tr key={time} className={Number(time.slice(0, 2)) % 2 === 1 ? "bg-surface-secondary/50" : undefined}>
                     <td
-                      className={`whitespace-nowrap py-1.5 pr-2 text-[10px] text-foreground ${time.endsWith(":00") ? "font-bold" : "font-medium text-muted-foreground"}`}
+                      className={`whitespace-nowrap py-1.5 pr-2 text-[10px] text-foreground ${
+                        time.endsWith(":00") ? "font-bold" : time.endsWith(":30") ? "font-medium text-muted-foreground" : "font-normal text-muted-foreground/70"
+                      }`}
                     >
                       {time}
                     </td>

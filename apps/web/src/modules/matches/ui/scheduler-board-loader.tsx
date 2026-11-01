@@ -4,10 +4,13 @@ import dynamic from "next/dynamic";
 import type { MatchListItem } from "../domain/match";
 
 /**
- * @dnd-kit genera ids internos (aria-describedby, etc.) que no coinciden entre el render
- * de servidor y el de cliente — mismatch de hidratación garantizado si este árbol se
- * server-renderiza. `ssr: false` solo es válido desde un Client Component, de ahí este
- * wrapper separado en vez de llamarlo directo desde page.tsx (Server Component).
+ * El planificador posiciona los partidos por píxeles en base a la hora
+ * actual (línea de "ahora") y usa drag-and-drop nativo del navegador — nada
+ * de esto tiene sentido en un render de servidor, y server-renderizarlo
+ * igual arriesga un mismatch de hidratación contra la hora real del
+ * cliente. `ssr: false` solo es válido desde un Client Component, de ahí
+ * este wrapper separado en vez de llamarlo directo desde page.tsx (Server
+ * Component).
  */
 const SchedulerBoard = dynamic(() => import("./scheduler-board").then((m) => m.SchedulerBoard), {
   ssr: false,
