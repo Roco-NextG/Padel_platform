@@ -10,14 +10,17 @@ import { scheduleMatchAction, unscheduleMatchAction } from "../application/match
 import { matchTeamLabel, type MatchListItem } from "../domain/match";
 
 const START_HOUR = 8;
-const END_HOUR = 24; // exclusivo — el último slot es 23:30
+const END_HOUR = 24; // exclusivo — el último slot es 23:45
 const POOL_DROPPABLE_ID = "pool";
+/** Cada cuánto se puede arrancar un partido — independiente de la duración del torneo, para que una duración que no sea múltiplo de 30 (45min, por ejemplo) no deje minutos muertos sin poder agendarse en la pista. */
+const SLOT_MINUTES = 15;
 
 function buildTimeSlots(): string[] {
   const slots: string[] = [];
   for (let h = START_HOUR; h < END_HOUR; h++) {
-    slots.push(`${String(h).padStart(2, "0")}:00`);
-    slots.push(`${String(h).padStart(2, "0")}:30`);
+    for (let m = 0; m < 60; m += SLOT_MINUTES) {
+      slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    }
   }
   return slots;
 }
@@ -78,7 +81,10 @@ function SlotCell({
   clubTimeZone: string;
   onUnschedule: (matchId: string) => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `cell:${courtId}:${time}`, disabled: !!blockedBy });
+  // "|" como separador, no ":" — `time` ya trae un ":" propio ("08:45"), así
+  // que separar por ":" partía mal el id (ver handleDragEnd) y cualquier
+  // horario que no fuera HH:00 se reagendaba silenciosamente en HH:00.
+  const { setNodeRef, isOver } = useDroppable({ id: `cell|${courtId}|${time}`, disabled: !!blockedBy });
   const removable = match && !LOCKED_STATUSES.has(match.status);
 
   return (
@@ -178,12 +184,12 @@ export function SchedulerBoard({
   // duración REAL del partido (scheduledStart→scheduledEnd ya guardados en
   // BD), no un valor fijo acá — así un partido agendado con una duración
   // vieja (90 min, antes de este cambio) sigue bloqueando visualmente lo que
-  // de verdad tiene reservado, y uno nuevo de 60 min bloquea exactamente 1
-  // celda extra (slots de 30 min).
+  // de verdad tiene reservado, y uno nuevo de 45 min bloquea exactamente los
+  // bloques de 15 min que le corresponden (ver SLOT_MINUTES).
   const { placedByCell, blockedCells } = useMemo(() => {
     const placed = new Map<string, MatchListItem>();
     const blocked = new Map<string, { match: MatchListItem; fraction: number }>();
-    const SLOT_MS = 30 * 60_000;
+    const SLOT_MS = SLOT_MINUTES * 60_000;
     for (const m of matches) {
       if (!m.scheduledStart || !m.courtId) continue;
       if (categoryFilter !== "Todas" && m.categoryName !== categoryFilter) continue;
@@ -193,8 +199,8 @@ export function SchedulerBoard({
       const startMs = new Date(m.scheduledStart).getTime();
       const endMs = new Date(m.scheduledEnd).getTime();
       // La última celda puede quedar solo parcialmente ocupada cuando la
-      // duración no es múltiplo de 30min (ej. 45min bloquea 1 celda entera y
-      // deja la mitad de la segunda libre) — `fraction` es lo que de verdad
+      // duración no es múltiplo de SLOT_MINUTES (ej. 50min con slots de
+      // 15min deja un resto de 5min) — `fraction` es lo que de verdad
       // tiene reservado ese bloque, para no pintarlo como ocupado del todo.
       for (let t = startMs + SLOT_MS; t < endMs; t += SLOT_MS) {
         const fraction = Math.min(1, (Math.min(endMs, t + SLOT_MS) - t) / SLOT_MS);
@@ -235,7 +241,7 @@ export function SchedulerBoard({
       return;
     }
 
-    const [, courtId, time] = overId.split(":");
+    const [, courtId, time] = overId.split("|");
     if (!courtId || !time) return;
 
     const scheduledStartIso = zonedSlotToIso(selectedDate, time, clubTimeZone);
@@ -346,8 +352,9 @@ export function SchedulerBoard({
                   <div key={time} className="contents">
                     <div
                       className={cn(
-                        "sticky left-0 z-[1] flex items-center justify-end bg-background px-2 text-[10px] font-medium text-muted-foreground",
-                        time.endsWith(":00") && "font-semibold text-foreground"
+                        "sticky left-0 z-[1] flex items-center justify-end bg-background px-2 text-[10px] font-medium text-foreground-tertiary",
+                        time.endsWith(":00") && "text-[10.5px] font-semibold text-foreground",
+                        time.endsWith(":30") && "text-muted-foreground"
                       )}
                     >
                       {time}
