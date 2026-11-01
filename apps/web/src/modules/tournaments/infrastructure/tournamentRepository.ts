@@ -16,7 +16,7 @@ export async function fetchMyTournaments(account: ClubSurfaceAccount): Promise<T
   let query = supabase
     .from("tournaments")
     .select(
-      "id, name, description, club_id, organizer_id, status, is_published, start_date, end_date, created_at, logo_url, cover_image_url, clubs(name, time_zone)"
+      "id, name, description, club_id, organizer_id, status, is_published, start_date, end_date, created_at, logo_url, cover_image_url, match_duration_minutes, clubs(name, time_zone)"
     )
     .order("created_at", { ascending: false });
 
@@ -65,6 +65,7 @@ export async function fetchMyTournaments(account: ClubSurfaceAccount): Promise<T
     createdAt: t.created_at,
     logoUrl: t.logo_url,
     coverImageUrl: t.cover_image_url,
+    matchDurationMinutes: t.match_duration_minutes,
   }));
 }
 
@@ -73,7 +74,7 @@ export async function fetchTournamentById(tournamentId: string): Promise<Tournam
   const { data, error } = await supabase
     .from("tournaments")
     .select(
-      "id, name, description, club_id, organizer_id, status, is_published, start_date, end_date, created_at, logo_url, cover_image_url, clubs(name, time_zone)"
+      "id, name, description, club_id, organizer_id, status, is_published, start_date, end_date, created_at, logo_url, cover_image_url, match_duration_minutes, clubs(name, time_zone)"
     )
     .eq("id", tournamentId)
     .maybeSingle();
@@ -97,6 +98,7 @@ export async function fetchTournamentById(tournamentId: string): Promise<Tournam
     createdAt: data.created_at,
     logoUrl: data.logo_url,
     coverImageUrl: data.cover_image_url,
+    matchDurationMinutes: data.match_duration_minutes,
   };
 }
 
@@ -148,6 +150,7 @@ export async function updateTournament(tournamentId: string, input: UpdateTourna
       description: input.description || null,
       start_date: input.startDate || null,
       end_date: input.endDate || null,
+      match_duration_minutes: input.matchDurationMinutes,
     })
     .eq("id", tournamentId);
   if (error) throw new Error(error.message);

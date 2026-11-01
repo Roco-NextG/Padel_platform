@@ -121,6 +121,7 @@ export default async function PartidosPage({
           courts={availableCourts}
           initialDate={initialDate}
           clubTimeZone={selectedTournament.clubTimeZone}
+          matchDurationMinutes={selectedTournament.matchDurationMinutes}
         />
       </div>
     );

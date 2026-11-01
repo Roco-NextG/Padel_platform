@@ -20,6 +20,8 @@ export interface Tournament {
   createdAt: string;
   logoUrl: string | null;
   coverImageUrl: string | null;
+  /** Usado por el planificador para calcular el horario de fin al programar un partido — configurable por torneo, default 60 (0036_tournament_match_duration.sql). */
+  matchDurationMinutes: number;
 }
 
 /** 8MB — una foto de portada real de celular ronda 3-8MB; el límite anterior (3MB) rechazaba en silencio la mayoría de las fotos reales (el error quedaba en texto chico debajo del banner, fácil de no ver — motivo real por el que "no funcionaba" la carga de portada). */
@@ -85,6 +87,11 @@ export const updateTournamentSchema = z
     description: z.string().trim().optional(),
     startDate: z.string().trim().optional(),
     endDate: z.string().trim().optional(),
+    matchDurationMinutes: z.coerce
+      .number()
+      .int()
+      .min(15, "La duración mínima es 15 minutos.")
+      .max(240, "La duración máxima es 240 minutos."),
   })
   .refine((data) => !data.startDate || !data.endDate || data.startDate <= data.endDate, {
     message: "La fecha de fin no puede ser anterior a la de inicio.",
