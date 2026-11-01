@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CalendarBlank } from "@phosphor-icons/react/dist/ssr";
+import { CalendarBlank, MapPin, UsersThree } from "@phosphor-icons/react/dist/ssr";
 import { requireTournamentManager } from "@/modules/tournaments/application/authGuard";
 import { getTournament } from "@/modules/tournaments/application/getTournaments";
 import { fetchMatchesForTournament } from "@/modules/matches/infrastructure/matchRepository";
@@ -47,10 +47,17 @@ function buildDaySlots(matches: MatchListItem[], timeZone: string): string[] {
 /**
  * Ruta fuera de (club) a propósito — sin el sidebar/header del panel, para
  * que "Guardar como PDF" (window.print) imprima solo la planificación, no
- * la app entera. Pedido explícito: horizontal, con el calendario completo
- * (todas las pistas, todos los partidos del día) tal como se ve en el
- * planificador, pero legible y compartible — ambas parejas siempre
- * completas, nada truncado.
+ * la app entera. Horizontal, con el calendario completo (todas las pistas,
+ * todos los partidos del día) tal como se ve en el planificador, pero
+ * legible y compartible — ambas parejas siempre completas, nada truncado.
+ *
+ * La cabecera reusa el mismo lenguaje de marca que ya usan las cards de
+ * torneo/liga (bg-inverse + glow radial en accent-muted, ver
+ * tournament-card.tsx) en vez de inventar un tratamiento nuevo — es el
+ * único otro lugar de la app donde el lime de cancha ocupa una región
+ * grande, no un accent suelto. print-color-adjust: exact es lo que hace
+ * que esos colores sobrevivan al "Guardar como PDF" — Chrome/Safari
+ * descartan los fondos de color al imprimir si no se pide explícitamente.
  */
 export default async function ImprimirPartidosPage({
   searchParams,
@@ -68,7 +75,10 @@ export default async function ImprimirPartidosPage({
 
   const selectedDate = fecha ?? tournament.startDate ?? todayZonedDateKey(tournament.clubTimeZone);
   const dateLabelIso = zonedSlotToIso(selectedDate, "12:00", tournament.clubTimeZone);
-  const dateLabel = formatZonedDate(dateLabelIso, { weekday: "long", day: "numeric", month: "long", year: "numeric" }, tournament.clubTimeZone);
+  const weekday = formatZonedDate(dateLabelIso, { weekday: "long" }, tournament.clubTimeZone);
+  const day = formatZonedDate(dateLabelIso, { day: "numeric" }, tournament.clubTimeZone);
+  const month = formatZonedDate(dateLabelIso, { month: "short" }, tournament.clubTimeZone).replace(".", "");
+  const year = formatZonedDate(dateLabelIso, { year: "numeric" }, tournament.clubTimeZone);
 
   const [allMatches, allCourts] = await Promise.all([fetchMatchesForTournament(torneo), fetchClubCourts(tournament.clubId)]);
   const courts = allCourts.filter((c) => c.status === "AVAILABLE");
@@ -102,10 +112,15 @@ export default async function ImprimirPartidosPage({
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-6 bg-background px-6 py-8 print:bg-white print:px-0 print:py-0 print:text-black">
-      <style>{"@media print { @page { size: landscape; margin: 12mm; } }"}</style>
+    <div className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-0 bg-background print:min-h-0">
+      <style>
+        {`@media print {
+          @page { size: landscape; margin: 10mm; }
+          html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }`}
+      </style>
 
-      <div className="flex items-start justify-between gap-4 print:hidden">
+      <div className="flex items-center justify-between gap-4 px-6 pt-6 print:hidden">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Planificación del día</h1>
           <p className="text-sm text-muted-foreground">Vista lista para compartir o guardar como PDF (Ctrl/Cmd+P → Guardar como PDF).</p>
@@ -113,78 +128,110 @@ export default async function ImprimirPartidosPage({
         <PrintButton />
       </div>
 
-      <div className="flex items-end justify-between gap-4 border-b border-border pb-4 print:border-black">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-black">{tournament.clubName}</span>
-          <h2 className="text-2xl font-semibold text-foreground print:text-black">{tournament.name}</h2>
-          <span className="text-sm capitalize text-muted-foreground print:text-black">{dateLabel}</span>
+      {/*
+        Colores fijos (no los tokens --inverse/--inverse-foreground, que se
+        invierten según el tema claro/oscuro) — esto es un panel de marca
+        "comprometido" a propósito, igual criterio que el panel de login
+        (ver docs/DESIGN.md: "el único lugar donde la estrategia de color
+        se vuelve Comprometida... fijo, sin importar el tema"). Con los
+        tokens que invierten, este panel se volvía casi blanco con texto
+        casi negro en tema oscuro — bug real, confirmado en pantalla.
+      */}
+      <div className="relative mx-6 mt-6 overflow-hidden rounded-2xl bg-[#16171a] px-7 py-6 bg-[radial-gradient(circle_at_14%_0%,var(--accent-glow),transparent_62%)] print:mx-0 print:mt-0 print:rounded-none">
+        <div className="flex items-start justify-between gap-6">
+          <div className="flex flex-col gap-3">
+            <div>
+              <h2 className="text-[26px] font-semibold leading-tight tracking-tight text-[#f5f5f3]">{tournament.name}</h2>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[#f5f5f3]/70">
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="size-3.5 text-accent" weight="fill" />
+                  {tournament.clubName}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <UsersThree className="size-3.5 text-accent" weight="fill" />
+                  {dayMatches.length} partido{dayMatches.length === 1 ? "" : "s"} · {courts.length} pista{courts.length === 1 ? "" : "s"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-3 border-l border-[#f5f5f3]/15 pl-6">
+            <div className="flex flex-col items-end">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">{weekday}</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-display text-[44px] font-semibold leading-none tabular-nums text-[#f5f5f3]">{day}</span>
+                <span className="text-sm font-medium uppercase text-[#f5f5f3]/70">
+                  {month}
+                  <br />
+                  {year}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
-        <DeuceUpWordmark className="h-7 w-auto shrink-0 text-foreground print:text-black" />
       </div>
 
-      {dayMatches.length === 0 || courts.length === 0 ? (
-        <EmptyState
-          icon={CalendarBlank}
-          title="Sin partidos programados ese día"
-          description="No hay partidos con horario y pista asignados para la fecha seleccionada."
-        />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-border print:border-black">
-                <th className="w-16 py-2 pr-2 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground print:text-black">
-                  Hora
-                </th>
-                {courts.map((c) => (
-                  <th
-                    key={c.id}
-                    className="border-l border-border px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground print:border-black print:text-black"
-                  >
-                    {c.name}
+      <div className="px-6 py-6 print:px-0 print:py-4">
+        {dayMatches.length === 0 || courts.length === 0 ? (
+          <EmptyState
+            icon={CalendarBlank}
+            title="Sin partidos programados ese día"
+            description="No hay partidos con horario y pista asignados para la fecha seleccionada."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr>
+                  <th className="w-16 border-b-2 border-b-accent-strong py-2 pr-2 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Hora
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {slots.map((time) => (
-                <tr key={time} className="border-b border-border align-top print:border-black">
-                  <td className="whitespace-nowrap py-1.5 pr-2 text-[10px] font-semibold text-foreground print:text-black">{time}</td>
-                  {courts.map((c) => {
-                    const key = `${c.id}:${time}`;
-                    if (covered.has(key)) return null;
-                    const cell = placedByCell.get(key);
-                    return (
-                      <td key={c.id} className="border-l border-border p-1 print:border-black" rowSpan={cell?.rowSpan}>
-                        {cell && (
-                          <div className="flex flex-col gap-0.5 rounded bg-surface-secondary p-1.5 print:bg-[#f2f2f2]">
-                            <span className="text-[8px] font-bold uppercase tracking-wide text-accent-text print:text-black">
-                              {cell.match.categoryName}
-                            </span>
-                            <span className="text-[9.5px] font-medium leading-snug text-foreground print:text-black">
-                              {matchTeamLabel(cell.match.teamA)}
-                            </span>
-                            <span className="text-[7.5px] font-semibold uppercase text-muted-foreground print:text-black">vs</span>
-                            <span className="text-[9.5px] font-medium leading-snug text-foreground print:text-black">
-                              {matchTeamLabel(cell.match.teamB)}
-                            </span>
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
+                  {courts.map((c) => (
+                    <th
+                      key={c.id}
+                      className="border-b-2 border-b-accent-strong border-l border-l-border px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-foreground"
+                    >
+                      {c.name}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {slots.map((time, rowIdx) => (
+                  <tr key={time} className={rowIdx % 2 === 1 ? "bg-surface-secondary/50" : undefined}>
+                    <td
+                      className={`whitespace-nowrap py-1.5 pr-2 text-[10px] text-foreground ${time.endsWith(":00") ? "font-bold" : "font-medium text-muted-foreground"}`}
+                    >
+                      {time}
+                    </td>
+                    {courts.map((c) => {
+                      const key = `${c.id}:${time}`;
+                      if (covered.has(key)) return null;
+                      const cell = placedByCell.get(key);
+                      return (
+                        <td key={c.id} className="border-l border-border p-1 align-top" rowSpan={cell?.rowSpan}>
+                          {cell && (
+                            <div className="flex h-full flex-col gap-0.5 rounded-md bg-accent-muted p-1.5">
+                              <span className="text-[8px] font-bold uppercase tracking-wide text-accent-text">{cell.match.categoryName}</span>
+                              <span className="text-[9.5px] font-medium leading-snug text-foreground">{matchTeamLabel(cell.match.teamA)}</span>
+                              <span className="text-[7.5px] font-semibold uppercase text-accent-text/70">vs</span>
+                              <span className="text-[9.5px] font-medium leading-snug text-foreground">{matchTeamLabel(cell.match.teamB)}</span>
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-      {dayMatches.length > 0 && (
-        <p className="text-xs text-muted-foreground print:text-black">
-          {dayMatches.length} partido{dayMatches.length === 1 ? "" : "s"} programado{dayMatches.length === 1 ? "" : "s"} para este día.
-        </p>
-      )}
+      <div className="flex items-center justify-center border-t border-border px-6 py-8 print:py-5">
+        <DeuceUpWordmark className="h-10 w-auto text-foreground" />
+      </div>
     </div>
   );
 }
