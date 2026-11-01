@@ -25,7 +25,13 @@ const TIME_SLOTS = buildTimeSlots();
 
 const LOCKED_STATUSES = new Set<MatchListItem["status"]>(["IN_PROGRESS", "PENDING_CONFIRMATION", "CONFIRMED", "DISPUTED", "CANCELLED"]);
 
-function MatchChip({ match, placed }: { match: MatchListItem; placed: boolean }) {
+/** "08:00–08:45" — null si todavía no tiene horario confirmado (partido sin agendar). */
+function matchTimeRangeLabel(match: MatchListItem, timeZone: string): string | null {
+  if (!match.scheduledStart || !match.scheduledEnd) return null;
+  return `${zonedTimeKey(match.scheduledStart, timeZone)}–${zonedTimeKey(match.scheduledEnd, timeZone)}`;
+}
+
+function MatchChip({ match, placed, timeRange }: { match: MatchListItem; placed: boolean; timeRange?: string | null }) {
   const draggable = !LOCKED_STATUSES.has(match.status);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: match.id,
@@ -44,7 +50,11 @@ function MatchChip({ match, placed }: { match: MatchListItem; placed: boolean })
         placed && "h-full"
       )}
     >
-      <span className="text-[9px] font-bold uppercase tracking-wide text-accent-text">{match.categoryName}</span>
+      <div className="flex items-start justify-between gap-1.5">
+        <span className="text-[9px] font-bold uppercase tracking-wide text-accent-text">{match.categoryName}</span>
+        {/* Confirma a simple vista la hora de inicio y fin real — necesario sobre todo cuando la duración del torneo no cae en :00/:30 (ej. 45min), donde la celda sola no alcanza a mostrarlo. */}
+        {timeRange && <span className="shrink-0 text-[8.5px] font-semibold tabular-nums text-muted-foreground">{timeRange}</span>}
+      </div>
       <span className="text-[10.5px] font-medium leading-snug text-foreground">{matchTeamLabel(match.teamA)}</span>
       <span className="text-[8.5px] font-semibold uppercase tracking-wide text-muted-foreground">vs</span>
       <span className="text-[10.5px] font-medium leading-snug text-foreground">{matchTeamLabel(match.teamB)}</span>
@@ -57,13 +67,15 @@ function SlotCell({
   time,
   match,
   blockedBy,
+  clubTimeZone,
   onUnschedule,
 }: {
   courtId: string;
   time: string;
   match: MatchListItem | undefined;
-  /** Set cuando esta celda cae DENTRO de la duración de un partido agendado en un slot anterior (no es su inicio) — bloqueada para soltar otro partido, sin chip propio. */
-  blockedBy: MatchListItem | undefined;
+  /** Set cuando esta celda cae DENTRO de la duración de un partido agendado en un slot anterior (no es su inicio) — bloqueada para soltar otro partido, sin chip propio. `fraction` es qué porción de este bloque de 30min ocupa de verdad (1 = todo, <1 cuando la duración no es múltiplo de 30 — ej. 45min deja la mitad del segundo bloque libre). */
+  blockedBy: { match: MatchListItem; fraction: number } | undefined;
+  clubTimeZone: string;
   onUnschedule: (matchId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `cell:${courtId}:${time}`, disabled: !!blockedBy });
@@ -76,13 +88,18 @@ function SlotCell({
         "relative min-h-11 border border-border bg-surface-secondary p-0.5 transition-colors",
         isOver && !match && "bg-accent-muted shadow-[inset_0_0_0_2px_var(--accent-strong)]",
         isOver && match && "bg-destructive-muted shadow-[inset_0_0_0_2px_var(--destructive)]",
-        match && "bg-surface",
-        blockedBy && "bg-[repeating-linear-gradient(135deg,var(--border)_0px,var(--border)_4px,transparent_4px,transparent_9px)]"
+        match && "bg-surface"
       )}
     >
+      {blockedBy && (
+        <div
+          className="absolute inset-x-0 top-0 bg-[repeating-linear-gradient(135deg,var(--border)_0px,var(--border)_4px,transparent_4px,transparent_9px)]"
+          style={{ height: `${blockedBy.fraction * 100}%` }}
+        />
+      )}
       {match && (
         <div className="group relative h-full">
-          <MatchChip match={match} placed />
+          <MatchChip match={match} placed timeRange={matchTimeRangeLabel(match, clubTimeZone)} />
           {removable && (
             <button
               type="button"
@@ -165,7 +182,8 @@ export function SchedulerBoard({
   // celda extra (slots de 30 min).
   const { placedByCell, blockedCells } = useMemo(() => {
     const placed = new Map<string, MatchListItem>();
-    const blocked = new Map<string, MatchListItem>();
+    const blocked = new Map<string, { match: MatchListItem; fraction: number }>();
+    const SLOT_MS = 30 * 60_000;
     for (const m of matches) {
       if (!m.scheduledStart || !m.courtId) continue;
       if (categoryFilter !== "Todas" && m.categoryName !== categoryFilter) continue;
@@ -174,8 +192,13 @@ export function SchedulerBoard({
       if (!m.scheduledEnd) continue;
       const startMs = new Date(m.scheduledStart).getTime();
       const endMs = new Date(m.scheduledEnd).getTime();
-      for (let t = startMs + 30 * 60_000; t < endMs; t += 30 * 60_000) {
-        blocked.set(`${m.courtId}:${zonedTimeKey(new Date(t).toISOString(), clubTimeZone)}`, m);
+      // La última celda puede quedar solo parcialmente ocupada cuando la
+      // duración no es múltiplo de 30min (ej. 45min bloquea 1 celda entera y
+      // deja la mitad de la segunda libre) — `fraction` es lo que de verdad
+      // tiene reservado ese bloque, para no pintarlo como ocupado del todo.
+      for (let t = startMs + SLOT_MS; t < endMs; t += SLOT_MS) {
+        const fraction = Math.min(1, (Math.min(endMs, t + SLOT_MS) - t) / SLOT_MS);
+        blocked.set(`${m.courtId}:${zonedTimeKey(new Date(t).toISOString(), clubTimeZone)}`, { match: m, fraction });
       }
     }
     return { placedByCell: placed, blockedCells: blocked };
@@ -336,6 +359,7 @@ export function SchedulerBoard({
                         time={time}
                         match={placedByCell.get(`${c.id}:${time}`)}
                         blockedBy={blockedCells.get(`${c.id}:${time}`)}
+                        clubTimeZone={clubTimeZone}
                         onUnschedule={handleUnschedule}
                       />
                     ))}
