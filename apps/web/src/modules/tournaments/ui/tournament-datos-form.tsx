@@ -161,6 +161,23 @@ export function TournamentDatosForm({ tournament }: { tournament: Tournament }) 
             </Field>
           </div>
 
+          <Field
+            id="matchDurationMinutes"
+            label="Duración promedio por partido"
+            hint="En minutos, entre 15 y 240 — el planificador la usa para calcular el horario de fin al programar un partido."
+          >
+            <Input
+              id="matchDurationMinutes"
+              name="matchDurationMinutes"
+              type="number"
+              min={15}
+              max={240}
+              step={5}
+              defaultValue={tournament.matchDurationMinutes}
+              required
+            />
+          </Field>
+
           <Field id="description" label="Descripción" optional>
             <Textarea id="description" name="description" rows={3} defaultValue={tournament.description ?? ""} />
           </Field>

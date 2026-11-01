@@ -15,8 +15,9 @@ import {
   setMatchSchedule,
   submitResult,
 } from "../infrastructure/matchRepository";
-import { MATCH_DURATION_MINUTES, resolveScoringConfig } from "../domain/match";
+import { resolveScoringConfig } from "../domain/match";
 import { requireTournamentManager } from "@/modules/tournaments/application/authGuard";
+import { getTournament } from "@/modules/tournaments/application/getTournaments";
 import { reconcileBracket } from "@/modules/tournaments/infrastructure/bracketRepository";
 import type { ScoringConfigJson } from "@/lib/supabase/database.types";
 
@@ -130,8 +131,11 @@ export async function scheduleMatchAction(
   const auth = await requireTournamentManager(tournamentId);
   if (!auth.ok) return { error: auth.error };
 
+  const tournament = await getTournament(tournamentId);
+  if (!tournament) return { error: "El torneo no existe." };
+
   const scheduledStart = new Date(scheduledStartIso);
-  const scheduledEnd = new Date(scheduledStart.getTime() + MATCH_DURATION_MINUTES * 60_000);
+  const scheduledEnd = new Date(scheduledStart.getTime() + tournament.matchDurationMinutes * 60_000);
 
   try {
     const hasConflict = await findScheduleConflict(courtId, scheduledStart.toISOString(), scheduledEnd.toISOString(), matchId);

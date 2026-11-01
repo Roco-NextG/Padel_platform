@@ -66,6 +66,7 @@ export async function updateTournamentAction(
     description: formData.get("description") || undefined,
     startDate: formData.get("startDate") || undefined,
     endDate: formData.get("endDate") || undefined,
+    matchDurationMinutes: formData.get("matchDurationMinutes"),
   };
   const parsed = updateTournamentSchema.safeParse(raw);
   if (!parsed.success) {

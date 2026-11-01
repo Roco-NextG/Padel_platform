@@ -7,7 +7,7 @@ import { CaretLeft, CaretRight, FilePdf, X } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { zonedDateKey, zonedSlotToIso, zonedTimeKey, shiftZonedDateKey } from "@/lib/timezone";
 import { scheduleMatchAction, unscheduleMatchAction } from "../application/matchActions";
-import { MATCH_DURATION_MINUTES, matchTeamLabel, type MatchListItem } from "../domain/match";
+import { matchTeamLabel, type MatchListItem } from "../domain/match";
 
 const START_HOUR = 8;
 const END_HOUR = 24; // exclusivo — el último slot es 23:30
@@ -134,12 +134,15 @@ export function SchedulerBoard({
   courts,
   initialDate,
   clubTimeZone,
+  matchDurationMinutes,
 }: {
   tournamentId: string;
   matches: MatchListItem[];
   courts: { id: string; name: string }[];
   initialDate: string;
   clubTimeZone: string;
+  /** Configurado por torneo (Datos del asistente) — usado acá solo para el chequeo optimista en el cliente; scheduleMatchAction recalcula lo mismo en el servidor, fuente de verdad real. */
+  matchDurationMinutes: number;
 }) {
   const [matches, setMatches] = useState(initialMatches);
   const [selectedDate, setSelectedDate] = useState(initialDate);
@@ -213,7 +216,7 @@ export function SchedulerBoard({
     if (!courtId || !time) return;
 
     const scheduledStartIso = zonedSlotToIso(selectedDate, time, clubTimeZone);
-    const scheduledEnd = new Date(new Date(scheduledStartIso).getTime() + MATCH_DURATION_MINUTES * 60_000).toISOString();
+    const scheduledEnd = new Date(new Date(scheduledStartIso).getTime() + matchDurationMinutes * 60_000).toISOString();
     const conflict = matches.some(
       (m) =>
         m.id !== matchId &&

@@ -216,6 +216,7 @@ export interface Database {
           end_date: string | null;
           scoring_config: ScoringConfigJson;
           tiebreak_rules: string[];
+          match_duration_minutes: number;
           created_at: string;
           updated_at: string;
         };
@@ -233,6 +234,7 @@ export interface Database {
           end_date?: string | null;
           scoring_config?: ScoringConfigJson;
           tiebreak_rules?: string[];
+          match_duration_minutes?: number;
         };
         Update: Partial<Database["public"]["Tables"]["tournaments"]["Insert"]>;
       };
